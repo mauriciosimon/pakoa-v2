@@ -1,0 +1,316 @@
+// Pakoa V2 - MLM Telecom Sales Distribution Platform
+// PostgreSQL + Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// USER & MLM TREE
+// =============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?  @unique
+  name      String
+  avatarUrl String?
+
+  // MLM Tree Structure (3-level deep referral)
+  parentId  String?
+  parent    User?    @relation("ReferralTree", fields: [parentId], references: [id])
+  children  User[]   @relation("ReferralTree")
+
+  // Activation status - unlocks at $1000 revenue
+  isActive           Boolean  @default(false)
+  activatedAt        DateTime?
+  totalRevenue       Decimal  @default(0) @db.Decimal(12, 2)
+
+  // Commission rates (stored for flexibility, defaults match business rules)
+  personalCommissionRate Decimal @default(0.30) @db.Decimal(5, 4) // 30%
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sales             Sale[]
+  commissionsEarned Commission[]    @relation("CommissionRecipient")
+  achievements      UserAchievement[]
+  campaigns         Campaign[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([totalRevenue])
+}
+
+// =============================================================================
+// SALES
+// =============================================================================
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  description String?
+  basePrice   Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales Sale[]
+}
+
+model Sale {
+  id        String   @id @default(cuid())
+
+  // Sale details
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(12, 2) // quantity * unitPrice
+
+  // Cycle reference for commission period
+  cycleId   String
+  cycle     Cycle    @relation(fields: [cycleId], references: [id])
+
+  // Optional campaign attribution
+  campaignId String?
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+
+  // Customer info (the end buyer)
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+
+  status    SaleStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  commissions Commission[]
+
+  @@index([userId])
+  @@index([cycleId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+enum SaleStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+// =============================================================================
+// COMMISSIONS
+// =============================================================================
+
+model Commission {
+  id        String   @id @default(cuid())
+
+  // Who receives the commission
+  userId    String
+  user      User     @relation("CommissionRecipient", fields: [userId], references: [id])
+
+  // Source sale
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id])
+
+  // Commission details
+  type      CommissionType
+  level     Int?     // null for PERSONAL, 1-3 for tree commissions
+  rate      Decimal  @db.Decimal(5, 4) // The rate applied (e.g., 0.30, 0.08, 0.12, 0.20)
+  amount    Decimal  @db.Decimal(12, 2)
+
+  // Payment tracking
+  cycleId   String
+  cycle     Cycle    @relation(fields: [cycleId], references: [id])
+  status    CommissionStatus @default(PENDING)
+  paidAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([cycleId])
+  @@index([status])
+}
+
+enum CommissionType {
+  PERSONAL   // 30% - direct sale commission
+  LEVEL_1    // 8% - first level referral
+  LEVEL_2    // 12% - second level referral
+  LEVEL_3    // 20% - third level referral
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+// =============================================================================
+// CAMPAIGNS (Budget System)
+// =============================================================================
+
+model Campaign {
+  id        String   @id @default(cuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  name      String
+
+  // Budget calculation: revenue / 2.5, clamped to [$200, $800]
+  // Renews weekly
+  totalBudget    Decimal  @db.Decimal(10, 2)
+  spentBudget    Decimal  @default(0) @db.Decimal(10, 2)
+  remainingBudget Decimal @db.Decimal(10, 2) // Computed: totalBudget - spentBudget
+
+  // Weekly renewal tracking
+  weekStartDate  DateTime
+  weekEndDate    DateTime
+
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales Sale[]
+
+  @@index([userId])
+  @@index([weekStartDate, weekEndDate])
+  @@index([isActive])
+}
+
+// =============================================================================
+// CYCLES (Commission Payment Periods)
+// =============================================================================
+
+model Cycle {
+  id        String   @id @default(cuid())
+
+  name      String   // e.g., "2024-W01", "January 2024 Week 1"
+
+  startDate DateTime
+  endDate   DateTime
+
+  status    CycleStatus @default(OPEN)
+
+  // Aggregate stats (denormalized for performance)
+  totalSales       Decimal @default(0) @db.Decimal(14, 2)
+  totalCommissions Decimal @default(0) @db.Decimal(14, 2)
+
+  closedAt  DateTime?
+  paidAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales       Sale[]
+  commissions Commission[]
+
+  @@unique([startDate, endDate])
+  @@index([status])
+}
+
+enum CycleStatus {
+  OPEN       // Accepting sales
+  CLOSED     // Sales finalized, calculating commissions
+  PROCESSING // Commissions being paid
+  COMPLETED  // All paid out
+}
+
+// =============================================================================
+// ACHIEVEMENTS (Gamification)
+// =============================================================================
+
+model Achievement {
+  id          String   @id @default(cuid())
+
+  code        String   @unique // e.g., "FIRST_SALE", "ACTIVATE", "10K_REVENUE"
+  name        String
+  description String
+  iconUrl     String?
+
+  // Achievement criteria (stored as JSON for flexibility)
+  criteria    Json     // e.g., {"type": "revenue", "threshold": 1000}
+
+  // Reward (optional)
+  rewardType   AchievementRewardType?
+  rewardValue  Decimal? @db.Decimal(10, 2)
+
+  // Display order
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+
+  earnedAt      DateTime @default(now())
+
+  // Progress tracking (for progressive achievements)
+  progress      Decimal? @db.Decimal(10, 2)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([earnedAt])
+}
+
+enum AchievementRewardType {
+  BONUS_COMMISSION
+  BUDGET_BOOST
+  BADGE_ONLY
+}
+
+// =============================================================================
+// BUSINESS RULES REFERENCE (Documented in Schema)
+// =============================================================================
+//
+// MLM TREE STRUCTURE:
+// - Maximum 3 levels deep from any user
+// - User.parentId creates the tree relationship
+//
+// COMMISSION RATES:
+// - Personal (direct sale): 30%
+// - Level 1 (direct referral's sale): 8%
+// - Level 2 (referral's referral's sale): 12%
+// - Level 3 (3rd level referral's sale): 20%
+//
+// USER ACTIVATION:
+// - Users start inactive (isActive = false)
+// - Activate when totalRevenue >= $1000
+// - Activation unlocks:
+//   1. Campaign budget system
+//   2. Tree commissions (Level 1/2/3)
+//
+// CAMPAIGN BUDGET:
+// - Formula: revenue / 2.5
+// - Minimum: $200
+// - Maximum: $800
+// - Renews weekly (tracked via weekStartDate/weekEndDate)
+//
+// =============================================================================
