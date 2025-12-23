@@ -1,4 +1,4 @@
-export type UserRole = 'user' | 'admin'
+export type UserRole = 'agent' | 'admin'
 
 export interface User {
   id: string
@@ -12,6 +12,19 @@ export interface User {
   totalRevenue: number
   role: UserRole
   createdAt: string
+  // Extended fields for admin views
+  parentName?: string
+  communitySize?: number
+  level?: number
+}
+
+export interface ImpersonationSession {
+  id: string
+  adminId: string
+  targetUserId: string
+  targetUser: User
+  startedAt: string
+  endedAt?: string
 }
 
 export interface Sale {

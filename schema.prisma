@@ -21,12 +21,15 @@ model User {
   name      String
   avatarUrl String?
 
+  // Role-based access control
+  role      UserRole @default(AGENT)
+
   // MLM Tree Structure (3-level deep referral)
   parentId  String?
   parent    User?    @relation("ReferralTree", fields: [parentId], references: [id])
   children  User[]   @relation("ReferralTree")
 
-  // Activation status - unlocks at $1000 revenue
+  // Activation status - unlocks at $15,000 revenue (Llave del Reino)
   isActive           Boolean  @default(false)
   activatedAt        DateTime?
   totalRevenue       Decimal  @default(0) @db.Decimal(12, 2)
@@ -38,14 +41,51 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  sales             Sale[]
-  commissionsEarned Commission[]    @relation("CommissionRecipient")
-  achievements      UserAchievement[]
-  campaigns         Campaign[]
+  sales                       Sale[]
+  commissionsEarned           Commission[]       @relation("CommissionRecipient")
+  achievements                UserAchievement[]
+  campaigns                   Campaign[]
+  llaveSnapshots              LlaveSnapshot[]    @relation("LlaveSnapshots")
+  legacySnapshots             CommissionSnapshot[] @relation("LegacySnapshots")
+  weeklyCommissionsReceived   WeeklyCommission[] @relation("WeeklyCommissionsReceived")
+  weeklyCommissionsSourcing   WeeklyCommission[] @relation("WeeklyCommissionsSourcing")
+
+  // Admin impersonation relations
+  impersonationsAsAdmin       ImpersonationSession[] @relation("AdminImpersonations")
+  impersonationsAsTarget      ImpersonationSession[] @relation("TargetImpersonations")
 
   @@index([parentId])
   @@index([isActive])
   @@index([totalRevenue])
+  @@index([role])
+}
+
+enum UserRole {
+  AGENT  // Regular sales agent
+  ADMIN  // Platform administrator
+}
+
+// =============================================================================
+// ADMIN IMPERSONATION
+// =============================================================================
+// Allows admins to view the platform as any user (read-only)
+// All sessions are logged for audit purposes
+
+model ImpersonationSession {
+  id            String    @id @default(cuid())
+
+  adminId       String
+  admin         User      @relation("AdminImpersonations", fields: [adminId], references: [id])
+
+  targetUserId  String
+  targetUser    User      @relation("TargetImpersonations", fields: [targetUserId], references: [id])
+
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime? // null if still active
+
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([startedAt])
 }
 
 // =============================================================================
@@ -72,37 +112,65 @@ model Sale {
   // Sale details
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
+  productId String?
+  product   Product?  @relation(fields: [productId], references: [id])
 
-  quantity  Int
-  unitPrice Decimal  @db.Decimal(10, 2)
-  totalPrice Decimal @db.Decimal(12, 2) // quantity * unitPrice
+  // Product info (can be set directly without Product relation)
+  productType String?   // e.g., "Internet 100MB", "Paquete TV+Internet"
+  amount      Decimal   @db.Decimal(12, 2)
+
+  quantity  Int       @default(1)
+  unitPrice Decimal?  @db.Decimal(10, 2)
+  totalPrice Decimal? @db.Decimal(12, 2) // quantity * unitPrice (legacy)
 
   // Cycle reference for commission period
-  cycleId   String
-  cycle     Cycle    @relation(fields: [cycleId], references: [id])
+  cycleId   String?
+  cycle     Cycle?    @relation(fields: [cycleId], references: [id])
 
   // Optional campaign attribution
   campaignId String?
   campaign   Campaign? @relation(fields: [campaignId], references: [id])
 
   // Customer info (the end buyer)
-  customerName  String?
+  customerName  String
   customerPhone String?
   customerEmail String?
 
+  // Funnel status
+  funnelStatus  FunnelStatus @default(PROSPECTO)
+
+  // Funnel stage timestamps
+  capturedAt    DateTime  @default(now()) // When lead was created
+  quotedAt      DateTime? // When quote was sent
+  scheduledAt   DateTime? // When installation was scheduled
+  installedAt   DateTime? // When installed - this counts toward KPI
+  cancelledAt   DateTime? // If cancelled
+
+  notes         String?
+
+  // Legacy status (kept for backward compatibility)
   status    SaleStatus @default(PENDING)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  commissions Commission[]
+  commissions       Commission[]
+  weeklyCommissions WeeklyCommission[]
 
   @@index([userId])
   @@index([cycleId])
   @@index([createdAt])
   @@index([status])
+  @@index([funnelStatus])
+  @@index([installedAt])
+}
+
+enum FunnelStatus {
+  PROSPECTO   // Initial lead
+  COTIZADO    // Quote sent
+  AGENDADO    // Installation scheduled
+  INSTALADO   // Installed - counts toward KPI
+  CANCELADO   // Cancelled
 }
 
 enum SaleStatus {
@@ -110,6 +178,91 @@ enum SaleStatus {
   CONFIRMED
   CANCELLED
   REFUNDED
+}
+
+// =============================================================================
+// LLAVE DEL REINO (Weekly Threshold Snapshots)
+// =============================================================================
+// Threshold: $15,000 in rolling 30-day sales
+// Evaluated every Wednesday at 00:00 CST (Mexico City)
+// Must be re-earned weekly - dropping below loses Llave status
+
+model LlaveSnapshot {
+  id                String   @id @default(cuid())
+
+  userId            String
+  user              User     @relation("LlaveSnapshots", fields: [userId], references: [id])
+
+  weekDate          DateTime // The Wednesday date of evaluation
+  rolling30DaySales Decimal  @db.Decimal(12, 2) // Sales amount at snapshot time
+  hasLlave          Boolean  // Was >= $15,000 at snapshot time
+
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, weekDate])
+  @@index([userId])
+  @@index([weekDate])
+  @@index([hasLlave])
+}
+
+// =============================================================================
+// WEEKLY COMMISSIONS (Chain-based Commission Tracking)
+// =============================================================================
+// Commissions are calculated weekly based on Llave status
+// Chain rule: Every person in path must have Llave for commission to flow
+// Max 3 generations: Hijo (8%), Nieto (12%), Bisnieto (20%)
+
+model WeeklyCommission {
+  id               String   @id @default(cuid())
+
+  recipientId      String
+  recipient        User     @relation("WeeklyCommissionsReceived", fields: [recipientId], references: [id])
+
+  sourceAgentId    String
+  sourceAgent      User     @relation("WeeklyCommissionsSourcing", fields: [sourceAgentId], references: [id])
+
+  saleId           String
+  sale             Sale     @relation(fields: [saleId], references: [id])
+
+  weekDate         DateTime // The Wednesday of the commission week
+  relationship     RelationshipType // hijo, nieto, bisnieto
+  saleAmount       Decimal  @db.Decimal(12, 2)
+  commissionRate   Decimal  @db.Decimal(5, 4) // 0.08, 0.12, or 0.20
+  commissionAmount Decimal  @db.Decimal(12, 2)
+  chainValid       Boolean  // Was the chain unbroken at calculation time
+
+  createdAt        DateTime @default(now())
+
+  @@index([recipientId])
+  @@index([sourceAgentId])
+  @@index([weekDate])
+  @@index([chainValid])
+}
+
+enum RelationshipType {
+  HIJO      // Level 1 - 8%
+  NIETO     // Level 2 - 12%
+  BISNIETO  // Level 3 - 20%
+}
+
+// Legacy model - kept for backward compatibility
+model CommissionSnapshot {
+  id               String   @id @default(cuid())
+
+  userId           String
+  user             User     @relation("LegacySnapshots", fields: [userId], references: [id])
+
+  weekStartDate    DateTime // The Wednesday when snapshot was taken
+  rolling30DaySales Decimal @db.Decimal(12, 2) // Sales amount at time of snapshot
+  isActive         Boolean  // Was >= $1000 at snapshot time
+  commissionEarned Decimal  @db.Decimal(12, 2) @default(0)
+
+  createdAt        DateTime @default(now())
+
+  @@unique([userId, weekStartDate])
+  @@index([userId])
+  @@index([weekStartDate])
+  @@index([isActive])
 }
 
 // =============================================================================
@@ -291,21 +444,28 @@ enum AchievementRewardType {
 // =============================================================================
 //
 // MLM TREE STRUCTURE:
-// - Maximum 3 levels deep from any user
+// - Maximum 3 levels deep commission scope (NEVER beyond bisnietos)
 // - User.parentId creates the tree relationship
 //
-// COMMISSION RATES:
-// - Personal (direct sale): 30%
-// - Level 1 (direct referral's sale): 8%
-// - Level 2 (referral's referral's sale): 12%
-// - Level 3 (3rd level referral's sale): 20%
+// LLAVE DEL REINO (Key to the Kingdom):
+// - Threshold: $15,000 in rolling 30-day sales
+// - Evaluated every Wednesday at 00:00 CST (Mexico City timezone)
+// - Status is binary: Active (has Llave) or Inactive
+// - Must be re-earned every week
 //
-// USER ACTIVATION:
-// - Users start inactive (isActive = false)
-// - Activate when totalRevenue >= $1000
-// - Activation unlocks:
-//   1. Campaign budget system
-//   2. Tree commissions (Level 1/2/3)
+// COMMISSION RATES (Tree Commissions Only):
+// - Hijo (Level 1): 8%
+// - Nieto (Level 2): 12%
+// - Bisnieto (Level 3): 20%
+// - Tataranieto (Level 4+): 0% ALWAYS - no exceptions
+//
+// THE CHAIN RULE:
+// - Commissions only flow through UNBROKEN chains
+// - Every person in the path must have Llave active
+// - Example: You → Hijo → Nieto → Bisnieto
+//   - Hijo's sales → 8% (if You have Llave)
+//   - Nieto's sales → 12% (if You + Hijo have Llave)
+//   - Bisnieto's sales → 20% (if You + Hijo + Nieto have Llave)
 //
 // CAMPAIGN BUDGET:
 // - Formula: revenue / 2.5

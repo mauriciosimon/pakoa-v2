@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -18,6 +19,31 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Plus, Search } from 'lucide-react'
+
+// Mock products (internet packages)
+const internetPackages = [
+  {
+    id: '1',
+    sku: 'PLAN-BASIC',
+    name: 'Plan Básico',
+    description: 'Internet 50Mbps + 500 min llamadas',
+    price: 29.99,
+  },
+  {
+    id: '2',
+    sku: 'PLAN-PLUS',
+    name: 'Plan Plus',
+    description: 'Internet 100Mbps + llamadas ilimitadas',
+    price: 49.99,
+  },
+  {
+    id: '3',
+    sku: 'PLAN-PREMIUM',
+    name: 'Plan Premium',
+    description: 'Internet 300Mbps + llamadas + TV',
+    price: 89.99,
+  },
+]
 
 // Mock data
 const mockSales = [
@@ -72,6 +98,11 @@ const statusConfig = {
 export function Sales() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showNewSaleForm, setShowNewSaleForm] = useState(false)
+  const [selectedProductId, setSelectedProductId] = useState('')
+  const [quantity, setQuantity] = useState(1)
+
+  const selectedProduct = internetPackages.find(p => p.id === selectedProductId)
+  const totalPrice = selectedProduct ? (selectedProduct.price * quantity).toFixed(2) : '0.00'
 
   const filteredSales = mockSales.filter(
     (sale) =>
@@ -122,15 +153,30 @@ export function Sales() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Producto</label>
-                <Input placeholder="Seleccionar producto..." />
+                <Select
+                  value={selectedProductId}
+                  onChange={(e) => setSelectedProductId(e.target.value)}
+                >
+                  <option value="">Seleccionar paquete...</option>
+                  {internetPackages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.name} - ${pkg.price} ({pkg.description})
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Cantidad</label>
-                <Input type="number" defaultValue={1} min={1} />
+                <Input
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  min={1}
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Precio Total</label>
-                <Input type="number" placeholder="0.00" disabled />
+                <Input type="text" value={`$${totalPrice}`} disabled />
               </div>
               <div className="col-span-full flex justify-end gap-2">
                 <Button

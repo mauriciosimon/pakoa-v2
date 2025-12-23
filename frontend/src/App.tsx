@@ -7,6 +7,8 @@ import { Income } from '@/pages/Income'
 import { Team } from '@/pages/Team'
 import { Campaigns } from '@/pages/Campaigns'
 import { Profile } from '@/pages/Profile'
+import { World } from '@/pages/World'
+import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminCycles } from '@/pages/admin/AdminCycles'
@@ -20,8 +22,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth()
-  if (!isAdmin) {
+  const { isAdmin, isImpersonating } = useAuth()
+  // Block admin routes when impersonating (read-only mode for agent views)
+  if (!isAdmin || isImpersonating) {
     return <Navigate to="/dashboard" replace />
   }
   return <>{children}</>
@@ -41,19 +44,37 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
+        {/* Agent Routes (also accessible by admin) */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/sales" element={<Sales />} />
         <Route path="/income" element={<Income />} />
         <Route path="/team" element={<Team />} />
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/world" element={<World />} />
 
         {/* Admin Routes */}
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
         <Route
           path="/admin/users"
           element={
             <AdminRoute>
               <AdminUsers />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/mundo"
+          element={
+            <AdminRoute>
+              <World />
             </AdminRoute>
           }
         />

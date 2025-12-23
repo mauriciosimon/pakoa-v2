@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react'
 import {
   Card,
   CardContent,
@@ -8,90 +9,84 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Users, UserPlus, TrendingUp, Copy } from 'lucide-react'
+import { Users, UserPlus, TrendingUp, Copy, List, Hexagon, ChevronRight, ChevronDown, Globe } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { HoneycombMap } from '@/components/HoneycombMap'
+import { WorldMap } from '@/components/WorldMap'
+import {
+  mockUsers,
+  getUserById,
+  getTeamMembers,
+  hasLlave,
+  type MockUser,
+} from '@/data/mockData'
 
-// Mock team tree data
-const mockTeamTree = {
-  id: 'maria',
-  name: 'María García',
-  email: 'maria@pakoa.com',
-  isActive: true,
-  totalRevenue: 15000,
-  salesThisWeek: 2,
-  level: 0,
-  children: [
-    {
-      id: 'carlos',
-      name: 'Carlos Rodríguez',
-      email: 'carlos@pakoa.com',
-      isActive: true,
-      totalRevenue: 5200,
-      salesThisWeek: 3,
-      level: 1,
-      children: [
-        {
-          id: 'pedro',
-          name: 'Pedro López',
-          email: 'pedro@pakoa.com',
-          isActive: true,
-          totalRevenue: 2100,
-          salesThisWeek: 1,
-          level: 2,
-          children: [
-            {
-              id: 'diego',
-              name: 'Diego Ramírez',
-              email: 'diego@pakoa.com',
-              isActive: false,
-              totalRevenue: 400,
-              salesThisWeek: 0,
-              level: 3,
-              children: [],
-            },
-          ],
-        },
-        {
-          id: 'laura',
-          name: 'Laura Sánchez',
-          email: 'laura@pakoa.com',
-          isActive: false,
-          totalRevenue: 750,
-          salesThisWeek: 0,
-          level: 2,
-          children: [],
-        },
-      ],
-    },
-    {
-      id: 'ana',
-      name: 'Ana Martínez',
-      email: 'ana@pakoa.com',
-      isActive: true,
-      totalRevenue: 3800,
-      salesThisWeek: 1,
-      level: 1,
-      children: [
-        {
-          id: 'sofia',
-          name: 'Sofía Hernández',
-          email: 'sofia@pakoa.com',
-          isActive: true,
-          totalRevenue: 1200,
-          salesThisWeek: 1,
-          level: 2,
-          children: [],
-        },
-      ],
-    },
-  ],
+// Tree node type for display
+interface TeamTreeNode {
+  id: string
+  name: string
+  email: string
+  isActive: boolean
+  totalRevenue: number
+  sales30d: number
+  salesThisWeek: number
+  level: number // relative level (0 = current user, 1 = hijo, etc.)
+  children: TeamTreeNode[]
 }
 
-const mockStats = {
-  totalTeamSize: 6,
-  activeMembers: 4,
-  teamSalesThisWeek: 8,
-  teamRevenueThisWeek: 1250.50,
+// Build a tree structure from flat mockUsers data starting from a user
+function buildTeamTree(userId: string, currentUserLevel: number = 0): TeamTreeNode | null {
+  const user = getUserById(userId)
+  if (!user) return null
+
+  // Get direct children
+  const directChildren = mockUsers.filter(u => u.parentId === userId)
+
+  // Build tree recursively (limit to 3 levels of depth for display)
+  const relativeLevel = user.level - currentUserLevel
+
+  const node: TeamTreeNode = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    isActive: hasLlave(user.sales30d),
+    totalRevenue: user.totalRevenue,
+    sales30d: user.sales30d,
+    salesThisWeek: Math.floor(user.sales30d / 4), // approximate weekly
+    level: relativeLevel,
+    children: relativeLevel < 3
+      ? directChildren.map(child => buildTeamTree(child.id, currentUserLevel)!).filter(Boolean)
+      : [],
+  }
+
+  return node
+}
+
+// Calculate team stats
+function calculateTeamStats(teamMembers: MockUser[]) {
+  const activeMembers = teamMembers.filter(m => hasLlave(m.sales30d))
+  const totalSales30d = teamMembers.reduce((sum, m) => sum + m.sales30d, 0)
+
+  // Calculate max depth
+  const teamIds = new Set(teamMembers.map(m => m.id))
+  let maxDepth = 0
+  teamMembers.forEach(member => {
+    let depth = 0
+    let current: MockUser | undefined = member
+    while (current && teamIds.has(current.id)) {
+      depth++
+      current = mockUsers.find(u => u.id === current?.parentId)
+    }
+    maxDepth = Math.max(maxDepth, depth)
+  })
+
+  return {
+    totalTeamSize: teamMembers.length,
+    activeMembers: activeMembers.length,
+    teamSalesThisWeek: Math.floor(totalSales30d / 4), // approximate
+    teamRevenueThisWeek: totalSales30d / 4,
+    maxDepth,
+  }
 }
 
 const levelColors = [
@@ -102,11 +97,15 @@ const levelColors = [
 ]
 
 interface TeamMemberProps {
-  member: typeof mockTeamTree
+  member: TeamTreeNode
   isRoot?: boolean
+  defaultExpanded?: boolean
 }
 
-function TeamMember({ member, isRoot = false }: TeamMemberProps) {
+function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemberProps) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const hasChildren = member.children && member.children.length > 0
+
   const initials = member.name
     .split(' ')
     .map((n) => n[0])
@@ -115,8 +114,25 @@ function TeamMember({ member, isRoot = false }: TeamMemberProps) {
   return (
     <div className="space-y-2">
       <div
-        className={`flex items-center gap-3 rounded-lg border-l-4 bg-card p-3 shadow-sm ${levelColors[member.level]}`}
+        className={`flex items-center gap-3 rounded-lg border-l-4 bg-card p-3 shadow-sm ${levelColors[Math.min(member.level, levelColors.length - 1)]} transition-all hover:shadow-md`}
       >
+        {/* Expand/Collapse Toggle */}
+        {hasChildren ? (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted transition-colors"
+            aria-label={isExpanded ? 'Colapsar' : 'Expandir'}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+        ) : (
+          <div className="w-8" />
+        )}
+
         <Avatar className="h-10 w-10">
           <AvatarFallback>{initials}</AvatarFallback>
         </Avatar>
@@ -131,21 +147,26 @@ function TeamMember({ member, isRoot = false }: TeamMemberProps) {
             <Badge variant={member.isActive ? 'success' : 'secondary'}>
               {member.isActive ? 'Activo' : 'Inactivo'}
             </Badge>
+            {hasChildren && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                {member.children.length} referido{member.children.length > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">{member.email}</p>
         </div>
         <div className="text-right">
-          <p className="font-medium">${member.totalRevenue.toLocaleString()}</p>
+          <p className="font-medium">${member.sales30d.toLocaleString()}</p>
           <p className="text-sm text-muted-foreground">
-            {member.salesThisWeek} ventas esta semana
+            Ventas 30 días
           </p>
         </div>
       </div>
 
-      {member.children && member.children.length > 0 && (
-        <div className="ml-6 space-y-2 border-l-2 border-dashed border-muted pl-4">
+      {hasChildren && isExpanded && (
+        <div className="ml-6 space-y-2 border-l-2 border-dashed border-muted pl-4 animate-in slide-in-from-top-2 duration-200">
           {member.children.map((child) => (
-            <TeamMember key={child.id} member={child} />
+            <TeamMember key={child.id} member={child} defaultExpanded={false} />
           ))}
         </div>
       )}
@@ -153,13 +174,45 @@ function TeamMember({ member, isRoot = false }: TeamMemberProps) {
   )
 }
 
+type TabType = 'lista' | 'mapa' | 'mundo'
+
 export function Team() {
-  const { user } = useAuth()
-  const referralLink = `https://pakoa.com/ref/${user?.id || 'abc123'}`
+  const { effectiveUser } = useAuth()
+  const [activeTab, setActiveTab] = useState<TabType>('lista')
+  const referralLink = `https://pakoa.com/ref/${effectiveUser?.id || 'abc123'}`
+
+  // Get current user data from centralized mock data
+  const currentUserData = useMemo(() => {
+    if (!effectiveUser) return null
+    return getUserById(effectiveUser.id) ||
+           mockUsers.find(u => u.email === effectiveUser.email) ||
+           mockUsers[0]
+  }, [effectiveUser])
+
+  // Build team tree starting from current user
+  const teamTree = useMemo(() => {
+    if (!currentUserData) return null
+    return buildTeamTree(currentUserData.id, currentUserData.level)
+  }, [currentUserData])
+
+  // Get flat list of team members for stats
+  const teamMembers = useMemo(() => {
+    if (!currentUserData) return []
+    return getTeamMembers(currentUserData.id)
+  }, [currentUserData])
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    return calculateTeamStats(teamMembers)
+  }, [teamMembers])
 
   const copyReferralLink = () => {
     navigator.clipboard.writeText(referralLink)
     // TODO: Show toast notification
+  }
+
+  if (!currentUserData || !teamTree) {
+    return <div className="p-4">Cargando...</div>
   }
 
   return (
@@ -188,9 +241,9 @@ export function Team() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mockStats.totalTeamSize}</div>
+            <div className="text-2xl font-bold">{stats.totalTeamSize}</div>
             <p className="text-xs text-muted-foreground">
-              {mockStats.activeMembers} activos
+              {stats.activeMembers} activos
             </p>
           </CardContent>
         </Card>
@@ -204,9 +257,9 @@ export function Team() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {mockStats.teamSalesThisWeek}
+              ${stats.teamSalesThisWeek.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Esta semana</p>
+            <p className="text-xs text-muted-foreground">Esta semana (aprox)</p>
           </CardContent>
         </Card>
 
@@ -219,23 +272,112 @@ export function Team() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${mockStats.teamRevenueThisWeek.toLocaleString()}
+              ${stats.teamRevenueThisWeek.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Esta semana</p>
+            <p className="text-xs text-muted-foreground">Últimos 30 días / 4</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tu Nivel</CardTitle>
+            <CardTitle className="text-sm font-medium">Tu Red</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">3 niveles</div>
+            <div className="text-2xl font-bold">{stats.maxDepth} niveles</div>
             <p className="text-xs text-muted-foreground">Profundidad máxima</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('lista')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'lista'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <List className="h-4 w-4" />
+          Lista
+        </button>
+        <button
+          onClick={() => setActiveTab('mapa')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'mapa'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Hexagon className="h-4 w-4" />
+          Mapa de Comunidad
+        </button>
+        <button
+          onClick={() => setActiveTab('mundo')}
+          className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'mundo'
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Globe className="h-4 w-4" />
+          Mundo
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'lista' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Árbol de Referidos</CardTitle>
+            <CardDescription>
+              Estructura completa de tu red (máximo 3 niveles para comisiones)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Level Legend */}
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-blue-500" />
+                  <span>Tú (Nivel 0)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-green-500" />
+                  <span>Hijos - Nivel 1 (8%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-purple-500" />
+                  <span>Nietos - Nivel 2 (12%)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded bg-orange-500" />
+                  <span>Bisnietos - Nivel 3 (20%)</span>
+                </div>
+              </div>
+
+              {/* Tree Visualization */}
+              <div className="rounded-lg border p-4">
+                {teamTree.children.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                    <p className="font-medium">No tienes referidos aún</p>
+                    <p className="text-sm">Comparte tu link para comenzar a construir tu equipo</p>
+                  </div>
+                ) : (
+                  <TeamMember member={teamTree} isRoot />
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === 'mapa' && <HoneycombMap rootUserId={currentUserData.id} />}
+
+      {activeTab === 'mundo' && <WorldMap />}
 
       {/* Referral Link */}
       <Card>
@@ -258,47 +400,9 @@ export function Team() {
             </Button>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Recibirás comisiones de hasta 3 niveles de profundidad: 8% (N1), 12%
-            (N2), 20% (N3)
+            Recibirás comisiones de hasta 3 niveles de profundidad: 8% (Hijos), 12%
+            (Nietos), 20% (Bisnietos)
           </p>
-        </CardContent>
-      </Card>
-
-      {/* Team Tree */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Árbol de Referidos</CardTitle>
-          <CardDescription>
-            Estructura completa de tu red (máximo 3 niveles)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Level Legend */}
-            <div className="flex flex-wrap gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-blue-500" />
-                <span>Tú (Nivel 0)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-green-500" />
-                <span>Nivel 1 (8%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-purple-500" />
-                <span>Nivel 2 (12%)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-orange-500" />
-                <span>Nivel 3 (20%)</span>
-              </div>
-            </div>
-
-            {/* Tree Visualization */}
-            <div className="rounded-lg border p-4">
-              <TeamMember member={mockTeamTree} isRoot />
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

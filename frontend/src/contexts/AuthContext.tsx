@@ -1,47 +1,147 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import type { User } from '@/types'
+
+interface ImpersonationState {
+  isImpersonating: boolean
+  originalAdmin: User | null
+  impersonatedUser: User | null
+}
 
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isAdmin: boolean
+  isImpersonating: boolean
+  impersonatedUser: User | null
+  originalAdmin: User | null
+  effectiveUser: User | null // The user whose perspective we're viewing
   login: (email: string, password: string) => Promise<void>
+  loginAsAdmin: () => void
+  loginAsAgent: () => void
   logout: () => void
+  startImpersonation: (targetUser: User) => void
+  stopImpersonation: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Mock user data - matches the seeded María from the database
-const mockUser: User = {
+// Mock admin user
+const mockAdminUser: User = {
+  id: 'mock-admin-id',
+  email: 'admin@pakoa.com',
+  phone: '+521234560001',
+  name: 'Admin Principal',
+  isActive: true,
+  activatedAt: '2024-01-01T00:00:00Z',
+  totalRevenue: 0,
+  role: 'admin',
+  createdAt: '2024-01-01T00:00:00Z',
+}
+
+// Mock agent user (María - the root agent)
+const mockAgentUser: User = {
   id: 'mock-maria-id',
   email: 'maria@pakoa.com',
-  phone: '+1234567001',
+  phone: '+521234567001',
   name: 'María García',
   isActive: true,
   activatedAt: '2024-01-01T00:00:00Z',
-  totalRevenue: 15000,
-  role: 'admin', // María is an admin for demo purposes
+  totalRevenue: 45000,
+  role: 'agent',
   createdAt: '2024-01-01T00:00:00Z',
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(mockUser) // Auto-logged in for dev
+  // Start as admin for development
+  const [user, setUser] = useState<User | null>(mockAdminUser)
+
+  const [impersonation, setImpersonation] = useState<ImpersonationState>({
+    isImpersonating: false,
+    originalAdmin: null,
+    impersonatedUser: null,
+  })
 
   const login = async (_email: string, _password: string) => {
     // Mock login - in production this would call the API
-    setUser(mockUser)
+    // For now, default to admin login
+    setUser(mockAdminUser)
   }
 
-  const logout = () => {
+  const loginAsAdmin = useCallback(() => {
+    setUser(mockAdminUser)
+    setImpersonation({
+      isImpersonating: false,
+      originalAdmin: null,
+      impersonatedUser: null,
+    })
+  }, [])
+
+  const loginAsAgent = useCallback(() => {
+    setUser(mockAgentUser)
+    setImpersonation({
+      isImpersonating: false,
+      originalAdmin: null,
+      impersonatedUser: null,
+    })
+  }, [])
+
+  const logout = useCallback(() => {
     setUser(null)
-  }
+    setImpersonation({
+      isImpersonating: false,
+      originalAdmin: null,
+      impersonatedUser: null,
+    })
+  }, [])
+
+  const startImpersonation = useCallback((targetUser: User) => {
+    if (user?.role !== 'admin') {
+      console.error('Only admins can impersonate users')
+      return
+    }
+
+    setImpersonation({
+      isImpersonating: true,
+      originalAdmin: user,
+      impersonatedUser: targetUser,
+    })
+
+    // Log the impersonation session (would be API call in production)
+    console.log(`[AUDIT] Admin ${user.name} started impersonation of ${targetUser.name}`)
+  }, [user])
+
+  const stopImpersonation = useCallback(() => {
+    if (impersonation.originalAdmin) {
+      console.log(`[AUDIT] Admin ${impersonation.originalAdmin.name} stopped impersonation of ${impersonation.impersonatedUser?.name}`)
+    }
+
+    setImpersonation({
+      isImpersonating: false,
+      originalAdmin: null,
+      impersonatedUser: null,
+    })
+  }, [impersonation])
+
+  // The effective user is the one whose perspective we're viewing
+  // When impersonating, it's the impersonated user; otherwise, it's the logged-in user
+  const effectiveUser = impersonation.isImpersonating
+    ? impersonation.impersonatedUser
+    : user
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    isImpersonating: impersonation.isImpersonating,
+    impersonatedUser: impersonation.impersonatedUser,
+    originalAdmin: impersonation.originalAdmin,
+    effectiveUser,
     login,
+    loginAsAdmin,
+    loginAsAgent,
     logout,
+    startImpersonation,
+    stopImpersonation,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
