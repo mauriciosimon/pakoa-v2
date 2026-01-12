@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   mockUsers,
   LLAVE_THRESHOLD,
@@ -375,6 +376,7 @@ function findUserById(node: UserNode, id: string): UserNode | null {
 }
 
 export function WorldMap() {
+  const { t } = useTranslation()
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -470,13 +472,13 @@ export function WorldMap() {
   const panScaled = { x: (pan.x / zoom) * -1, y: (pan.y / zoom) * -1 }
 
   const levelNames: Record<number, string> = {
-    0: 'Plataforma',
-    1: 'Nivel 1',
-    2: 'Nivel 2',
-    3: 'Nivel 3',
-    4: 'Nivel 4',
-    5: 'Nivel 5',
-    6: 'Nivel 6+',
+    0: t('world.platform'),
+    1: t('world.level1to6', { level: 1 }),
+    2: t('world.level1to6', { level: 2 }),
+    3: t('world.level1to6', { level: 3 }),
+    4: t('world.level1to6', { level: 4 }),
+    5: t('world.level1to6', { level: 5 }),
+    6: t('world.level1to6', { level: 6 }),
   }
 
   return (
@@ -489,7 +491,7 @@ export function WorldMap() {
             onClick={handleReset}
             className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-medium shadow-lg transition-colors"
           >
-            Reset
+            {t('common.reset')}
           </button>
           <button
             onClick={() => setZoom(z => Math.min(z * 1.5, 8))}
@@ -507,9 +509,9 @@ export function WorldMap() {
 
         {/* Title */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-center">
-          <h2 className="text-xl font-bold">Mundo PAKOA</h2>
+          <h2 className="text-xl font-bold">{t('world.title')}</h2>
           <p className="text-sm text-white/50">
-            {totalUsers} usuarios • Pinch para zoom, scroll para navegar
+            {t('world.usersCount', { count: totalUsers })} • {t('world.trackpadInstructions')}
           </p>
         </div>
 
@@ -612,11 +614,11 @@ export function WorldMap() {
         {/* Stats */}
         <div className="absolute bottom-4 left-4 bg-slate-800/80 backdrop-blur rounded-lg px-4 py-2 text-sm flex gap-4">
           <div>
-            <span className="text-white/50">Usuarios: </span>
+            <span className="text-white/50">{t('world.users')}: </span>
             <span className="font-bold">{totalUsers}</span>
           </div>
           <div>
-            <span className="text-white/50">Niveles: </span>
+            <span className="text-white/50">{t('team.levels')}: </span>
             <span className="font-bold">{Object.keys(levelCounts).length}</span>
           </div>
         </div>
@@ -626,30 +628,30 @@ export function WorldMap() {
       <div className="w-64 bg-slate-800/30 p-4 space-y-4 border-l border-white/10">
         {/* Legend */}
         <div className="bg-slate-700/30 rounded-xl p-4">
-          <h3 className="font-bold mb-3">Ventas 30 Días</h3>
+          <h3 className="font-bold mb-3">{t('legend.title')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-green-500"></div>
-              <span>Mayor a $17,000</span>
+              <span>{t('legend.above17k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-              <span>$15,000 - $17,000</span>
+              <span>{t('legend.15kTo17k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-              <span>$12,000 - $15,000</span>
+              <span>{t('legend.12kTo15k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-red-500"></div>
-              <span>Menor a $12,000</span>
+              <span>{t('legend.below12k')}</span>
             </div>
           </div>
         </div>
 
         {/* Distribution */}
         <div className="bg-slate-700/30 rounded-xl p-4">
-          <h3 className="font-bold mb-3">Distribución</h3>
+          <h3 className="font-bold mb-3">{t('world.distribution')}</h3>
           <div className="space-y-2 text-sm">
             {Object.entries(levelCounts)
               .sort(([a], [b]) => Number(a) - Number(b))
@@ -670,11 +672,11 @@ export function WorldMap() {
             <h3 className="font-bold mb-2">{selectedNode.name}</h3>
             <div className="text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-white/70">Nivel:</span>
+                <span className="text-white/70">{t('team.level')}:</span>
                 <span>{levelNames[selectedNode.level] || `Nivel ${selectedNode.level}`}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Ventas 30d:</span>
+                <span className="text-white/70">{t('llave.sales30d')}:</span>
                 <span
                   className="font-bold"
                   style={{ color: selectedNode.level === 0 ? '#6366f1' : getNodeColor(selectedNode.revenue30Days) }}
@@ -684,12 +686,12 @@ export function WorldMap() {
               </div>
               {selectedNode.email && selectedNode.level > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-white/70">Email:</span>
+                  <span className="text-white/70">{t('common.email')}:</span>
                   <span className="text-xs truncate max-w-[120px]">{selectedNode.email}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-white/70">Referidos:</span>
+                <span className="text-white/70">{t('common.referrals')}:</span>
                 <span className="font-bold">{selectedNode.childCount}</span>
               </div>
             </div>

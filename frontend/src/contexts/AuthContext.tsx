@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import type { User } from '@/types'
+import { getUserById } from '@/data/mockData'
 
 interface ImpersonationState {
   isImpersonating: boolean
@@ -18,6 +19,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>
   loginAsAdmin: () => void
   loginAsAgent: () => void
+  loginAsUser: (userId: string) => void // Direct login as any user (for testing)
   logout: () => void
   startImpersonation: (targetUser: User) => void
   stopImpersonation: () => void
@@ -39,8 +41,9 @@ const mockAdminUser: User = {
 }
 
 // Mock agent user (María - the root agent)
+// ID must match mockUsers 'user-maria' for data consistency
 const mockAgentUser: User = {
-  id: 'mock-maria-id',
+  id: 'user-maria',
   email: 'maria@pakoa.com',
   phone: '+521234567001',
   name: 'María García',
@@ -83,6 +86,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       originalAdmin: null,
       impersonatedUser: null,
     })
+  }, [])
+
+  // Login directly as any user (for testing full user experience)
+  const loginAsUser = useCallback((userId: string) => {
+    const targetUser = getUserById(userId)
+    if (!targetUser) {
+      console.error('User not found:', userId)
+      return
+    }
+
+    // Create a User object from MockUser
+    const userObject: User = {
+      id: targetUser.id,
+      email: targetUser.email,
+      phone: targetUser.phone,
+      name: targetUser.name,
+      isActive: targetUser.isActive,
+      activatedAt: targetUser.activatedAt,
+      totalRevenue: targetUser.totalRevenue,
+      role: targetUser.role,
+      createdAt: targetUser.createdAt,
+      parentId: targetUser.parentId,
+    }
+
+    setUser(userObject)
+    setImpersonation({
+      isImpersonating: false,
+      originalAdmin: null,
+      impersonatedUser: null,
+    })
+
+    console.log(`[DEV] Logged in directly as ${targetUser.name}`)
   }, [])
 
   const logout = useCallback(() => {
@@ -139,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     loginAsAdmin,
     loginAsAgent,
+    loginAsUser,
     logout,
     startImpersonation,
     stopImpersonation,

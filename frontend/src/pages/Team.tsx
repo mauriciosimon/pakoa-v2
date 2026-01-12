@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card,
   CardContent,
@@ -103,6 +104,7 @@ interface TeamMemberProps {
 }
 
 function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemberProps) {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const hasChildren = member.children && member.children.length > 0
 
@@ -121,7 +123,7 @@ function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemb
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted transition-colors"
-            aria-label={isExpanded ? 'Colapsar' : 'Expandir'}
+            aria-label={isExpanded ? t('common.collapse') : t('common.expand')}
           >
             {isExpanded ? (
               <ChevronDown className="h-5 w-5 text-muted-foreground" />
@@ -141,7 +143,7 @@ function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemb
             <span className="font-medium">{member.name}</span>
             {isRoot && (
               <Badge variant="outline" className="text-xs">
-                Tú
+                {t('common.you')}
               </Badge>
             )}
             <Badge variant={member.isActive ? 'success' : 'secondary'}>
@@ -149,7 +151,7 @@ function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemb
             </Badge>
             {hasChildren && (
               <Badge variant="outline" className="text-xs text-muted-foreground">
-                {member.children.length} referido{member.children.length > 1 ? 's' : ''}
+                {member.children.length} {member.children.length > 1 ? t('common.referrals') : t('common.referral')}
               </Badge>
             )}
           </div>
@@ -158,7 +160,7 @@ function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemb
         <div className="text-right">
           <p className="font-medium">${member.sales30d.toLocaleString()}</p>
           <p className="text-sm text-muted-foreground">
-            Ventas 30 días
+            {t('llave.sales30d')}
           </p>
         </div>
       </div>
@@ -177,6 +179,7 @@ function TeamMember({ member, isRoot = false, defaultExpanded = true }: TeamMemb
 type TabType = 'lista' | 'mapa' | 'mundo'
 
 export function Team() {
+  const { t } = useTranslation()
   const { effectiveUser } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('lista')
   const referralLink = `https://pakoa.com/ref/${effectiveUser?.id || 'abc123'}`
@@ -212,7 +215,7 @@ export function Team() {
   }
 
   if (!currentUserData || !teamTree) {
-    return <div className="p-4">Cargando...</div>
+    return <div className="p-4">{t('common.loading')}</div>
   }
 
   return (
@@ -220,14 +223,14 @@ export function Team() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mi Equipo</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t('team.title')}</h1>
           <p className="text-muted-foreground">
-            Visualiza y gestiona tu red de referidos
+            {t('team.subtitle')}
           </p>
         </div>
         <Button onClick={copyReferralLink}>
           <UserPlus className="mr-2 h-4 w-4" />
-          Copiar Link de Referido
+          {t('team.copyReferralLink')}
         </Button>
       </div>
 
@@ -236,14 +239,14 @@ export function Team() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Tamaño del Equipo
+              {t('team.teamSize')}
             </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalTeamSize}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.activeMembers} activos
+              {stats.activeMembers} {t('team.activeCount')}
             </p>
           </CardContent>
         </Card>
@@ -251,7 +254,7 @@ export function Team() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Ventas del Equipo
+              {t('team.teamSales')}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -259,14 +262,14 @@ export function Team() {
             <div className="text-2xl font-bold">
               ${stats.teamSalesThisWeek.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Esta semana (aprox)</p>
+            <p className="text-xs text-muted-foreground">{t('team.teamSalesSubtitle')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Ingresos del Equipo
+              {t('team.teamIncome')}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -274,18 +277,18 @@ export function Team() {
             <div className="text-2xl font-bold">
               ${stats.teamRevenueThisWeek.toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">Últimos 30 días / 4</p>
+            <p className="text-xs text-muted-foreground">{t('team.teamIncomeSubtitle')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tu Red</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('team.yourNetwork')}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.maxDepth} niveles</div>
-            <p className="text-xs text-muted-foreground">Profundidad máxima</p>
+            <div className="text-2xl font-bold">{stats.maxDepth} {t('team.levels')}</div>
+            <p className="text-xs text-muted-foreground">{t('team.maxDepth')}</p>
           </CardContent>
         </Card>
       </div>
@@ -301,7 +304,7 @@ export function Team() {
           }`}
         >
           <List className="h-4 w-4" />
-          Lista
+          {t('team.list')}
         </button>
         <button
           onClick={() => setActiveTab('mapa')}
@@ -312,7 +315,7 @@ export function Team() {
           }`}
         >
           <Hexagon className="h-4 w-4" />
-          Mapa de Comunidad
+          {t('team.communityMap')}
         </button>
         <button
           onClick={() => setActiveTab('mundo')}
@@ -323,7 +326,7 @@ export function Team() {
           }`}
         >
           <Globe className="h-4 w-4" />
-          Mundo
+          {t('team.world')}
         </button>
       </div>
 
@@ -331,9 +334,9 @@ export function Team() {
       {activeTab === 'lista' && (
         <Card>
           <CardHeader>
-            <CardTitle>Árbol de Referidos</CardTitle>
+            <CardTitle>{t('team.referralTree')}</CardTitle>
             <CardDescription>
-              Estructura completa de tu red (máximo 3 niveles para comisiones)
+              {t('team.referralTreeDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -342,19 +345,19 @@ export function Team() {
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded bg-blue-500" />
-                  <span>Tú (Nivel 0)</span>
+                  <span>{t('team.youLevel0')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded bg-green-500" />
-                  <span>Hijos - Nivel 1 (8%)</span>
+                  <span>{t('team.childrenLevel1')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded bg-purple-500" />
-                  <span>Nietos - Nivel 2 (12%)</span>
+                  <span>{t('team.grandchildrenLevel2')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 rounded bg-orange-500" />
-                  <span>Bisnietos - Nivel 3 (20%)</span>
+                  <span>{t('team.greatGrandchildrenLevel3')}</span>
                 </div>
               </div>
 
@@ -363,8 +366,8 @@ export function Team() {
                 {teamTree.children.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Users className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                    <p className="font-medium">No tienes referidos aún</p>
-                    <p className="text-sm">Comparte tu link para comenzar a construir tu equipo</p>
+                    <p className="font-medium">{t('team.noTeamMembersDesc')}</p>
+                    <p className="text-sm">{t('team.shareLink')}</p>
                   </div>
                 ) : (
                   <TeamMember member={teamTree} isRoot />
@@ -384,10 +387,10 @@ export function Team() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
-            Tu Link de Referido
+            {t('team.yourReferralLink')}
           </CardTitle>
           <CardDescription>
-            Comparte este link para invitar nuevos vendedores a tu equipo
+            {t('team.shareLinkDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -400,8 +403,7 @@ export function Team() {
             </Button>
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            Recibirás comisiones de hasta 3 niveles de profundidad: 8% (Hijos), 12%
-            (Nietos), 20% (Bisnietos)
+            {t('team.commissionInfo')}
           </p>
         </CardContent>
       </Card>

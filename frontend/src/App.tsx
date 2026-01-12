@@ -1,17 +1,25 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { AssistantProvider } from '@/contexts/AssistantContext'
+import { NotificationProvider } from '@/contexts/NotificationContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { AssistantButton, AssistantPanel } from '@/components/assistant'
+import { DevUserSwitcher } from '@/components/dev/DevUserSwitcher'
 import { Dashboard } from '@/pages/Dashboard'
 import { Sales } from '@/pages/Sales'
 import { Income } from '@/pages/Income'
 import { Team } from '@/pages/Team'
 import { Campaigns } from '@/pages/Campaigns'
+import { CampaignDetail } from '@/pages/CampaignDetail'
 import { Profile } from '@/pages/Profile'
+import { Trophies } from '@/pages/Trophies'
 import { World } from '@/pages/World'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminCycles } from '@/pages/admin/AdminCycles'
+import { AdminCampaigns } from '@/pages/admin/AdminCampaigns'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -28,6 +36,19 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/dashboard" replace />
   }
   return <>{children}</>
+}
+
+// Assistant components - only shown when authenticated
+function AssistantWrapper() {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return null
+
+  return (
+    <AssistantProvider>
+      <AssistantButton />
+      <AssistantPanel />
+    </AssistantProvider>
+  )
 }
 
 function AppRoutes() {
@@ -50,7 +71,9 @@ function AppRoutes() {
         <Route path="/income" element={<Income />} />
         <Route path="/team" element={<Team />} />
         <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/campaigns/:campaignId" element={<CampaignDetail />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/trophies" element={<Trophies />} />
         <Route path="/world" element={<World />} />
 
         {/* Admin Routes */}
@@ -94,6 +117,14 @@ function AppRoutes() {
             </AdminRoute>
           }
         />
+        <Route
+          path="/admin/campaigns"
+          element={
+            <AdminRoute>
+              <AdminCampaigns />
+            </AdminRoute>
+          }
+        />
       </Route>
 
       {/* Login placeholder */}
@@ -122,9 +153,15 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <AppRoutes />
+            <AssistantWrapper />
+            <DevUserSwitcher />
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

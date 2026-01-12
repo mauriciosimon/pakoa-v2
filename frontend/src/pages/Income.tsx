@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card,
   CardContent,
@@ -211,11 +212,11 @@ function formatWeekDate(dateStr: string): string {
   return date.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })
 }
 
-function getRelationshipConfig(rel: 'HIJO' | 'NIETO' | 'BISNIETO') {
+function getRelationshipConfig(rel: 'HIJO' | 'NIETO' | 'BISNIETO', t: any) {
   const configs = {
-    HIJO: { label: 'Hijo', color: 'bg-green-500', textColor: 'text-green-600', rate: '8%' },
-    NIETO: { label: 'Nieto', color: 'bg-purple-500', textColor: 'text-purple-600', rate: '12%' },
-    BISNIETO: { label: 'Bisnieto', color: 'bg-orange-500', textColor: 'text-orange-600', rate: '20%' },
+    HIJO: { label: t('income.childRelation'), color: 'bg-green-500', textColor: 'text-green-600', rate: '8%' },
+    NIETO: { label: t('income.grandchildRelation'), color: 'bg-purple-500', textColor: 'text-purple-600', rate: '12%' },
+    BISNIETO: { label: t('income.greatGrandchildRelation'), color: 'bg-orange-500', textColor: 'text-orange-600', rate: '20%' },
   }
   return configs[rel]
 }
@@ -226,9 +227,10 @@ function getRelationshipConfig(rel: 'HIJO' | 'NIETO' | 'BISNIETO') {
 
 // Chain Member Row (for Cadenas Activas section)
 function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: number }) {
+  const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(true)
   const hasChildren = member.children && member.children.length > 0
-  const config = getRelationshipConfig(member.relationship)
+  const config = getRelationshipConfig(member.relationship, t)
 
   return (
     <div className="space-y-1">
@@ -265,16 +267,16 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
               {config.label} ({config.rate})
             </Badge>
             {member.hasLlave ? (
-              <Badge variant="success" className="text-xs">Llave</Badge>
+              <Badge variant="success" className="text-xs">{t('llave.llave')}</Badge>
             ) : (
-              <Badge variant="destructive" className="text-xs">Sin Llave</Badge>
+              <Badge variant="destructive" className="text-xs">{t('llave.noLlave')}</Badge>
             )}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
-            Ventas 30d: ${member.sales30d.toLocaleString()}
+            {t('llave.sales30d')}: ${member.sales30d.toLocaleString()}
             {!member.hasLlave && member.sales30d < LLAVE_THRESHOLD && (
               <span className="ml-2 text-amber-600">
-                (Faltan ${(LLAVE_THRESHOLD - member.sales30d).toLocaleString()} para Llave)
+                ({t('llave.needForLlave', { amount: (LLAVE_THRESHOLD - member.sales30d).toLocaleString() })})
               </span>
             )}
           </div>
@@ -285,7 +287,7 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
             <div className="text-sm font-medium text-amber-600">
               +${member.potentialCommission.toFixed(2)}
             </div>
-            <div className="text-xs text-muted-foreground">potencial</div>
+            <div className="text-xs text-muted-foreground">{t('income.potential')}</div>
           </div>
         )}
       </div>
@@ -306,6 +308,7 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
 // =============================================================================
 
 export function Income() {
+  const { t } = useTranslation()
   const [historyFilter, setHistoryFilter] = useState<'all' | 'HIJO' | 'NIETO' | 'BISNIETO'>('all')
 
   // Calculate totals
@@ -333,9 +336,9 @@ export function Income() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mis Ingresos</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('income.title')}</h1>
         <p className="text-muted-foreground">
-          Comisiones de tu comunidad basadas en la Llave del Reino
+          {t('income.subtitle')}
         </p>
       </div>
 
@@ -346,10 +349,10 @@ export function Income() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className={`h-5 w-5 ${mockLlaveStatus.hasLlave ? 'text-green-500' : 'text-red-500'}`} />
-            Mi Llave del Reino
+            {t('llave.myLlave')}
           </CardTitle>
           <CardDescription>
-            Umbral: ${LLAVE_THRESHOLD.toLocaleString()} en ventas instaladas (últimos 30 días)
+            {t('llave.thresholdAmount', { amount: LLAVE_THRESHOLD.toLocaleString() })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -369,12 +372,12 @@ export function Income() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">
-                    {mockLlaveStatus.hasLlave ? 'ACTIVA' : 'INACTIVA'}
+                    {mockLlaveStatus.hasLlave ? t('llave.active') : t('llave.inactive')}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {mockLlaveStatus.hasLlave
-                      ? 'Estás recibiendo comisiones de tu comunidad'
-                      : 'No recibes comisiones de tu comunidad esta semana'}
+                      ? t('llave.receivingCommissions')
+                      : t('llave.notReceivingCommissions')}
                   </div>
                 </div>
               </div>
@@ -382,8 +385,8 @@ export function Income() {
               {/* Progress bar */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Ventas 30 días: ${mockLlaveStatus.rolling30DaySales.toLocaleString()}</span>
-                  <span className="text-muted-foreground">Meta: ${LLAVE_THRESHOLD.toLocaleString()}</span>
+                  <span>{t('llave.sales30d')}: ${mockLlaveStatus.rolling30DaySales.toLocaleString()}</span>
+                  <span className="text-muted-foreground">{t('llave.goal')}: ${LLAVE_THRESHOLD.toLocaleString()}</span>
                 </div>
                 <div className="h-4 w-full rounded-full bg-muted overflow-hidden">
                   <div
@@ -396,11 +399,11 @@ export function Income() {
                 <div className="text-sm text-muted-foreground">
                   {mockLlaveStatus.hasLlave ? (
                     <span className="text-green-600">
-                      ${(mockLlaveStatus.rolling30DaySales - LLAVE_THRESHOLD).toLocaleString()} por encima del umbral
+                      ${(mockLlaveStatus.rolling30DaySales - LLAVE_THRESHOLD).toLocaleString()} {t('llave.aboveThreshold')}
                     </span>
                   ) : (
                     <span className="text-amber-600">
-                      Te faltan ${(LLAVE_THRESHOLD - mockLlaveStatus.rolling30DaySales).toLocaleString()} para activar
+                      {t('llave.needForActivation', { amount: (LLAVE_THRESHOLD - mockLlaveStatus.rolling30DaySales).toLocaleString() })}
                     </span>
                   )}
                 </div>
@@ -413,16 +416,18 @@ export function Income() {
               <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
                 <Calendar className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <div className="font-medium">Próxima Evaluación</div>
+                  <div className="font-medium">{t('llave.nextEvaluationCard')}</div>
                   <div className="text-sm text-muted-foreground">
-                    En {daysUntilEval} día{daysUntilEval !== 1 ? 's' : ''} (Miércoles 00:00 CST)
+                    {daysUntilEval === 1
+                      ? t('llave.evaluationDay', { days: daysUntilEval })
+                      : t('llave.evaluationDays', { days: daysUntilEval })}
                   </div>
                 </div>
               </div>
 
               {/* 8-week history */}
               <div>
-                <div className="mb-2 text-sm font-medium">Historial de Llave (8 semanas)</div>
+                <div className="mb-2 text-sm font-medium">{t('llave.historyWeeks')}</div>
                 <div className="flex gap-1">
                   {mockLlaveHistory.map((week, i) => (
                     <div
@@ -434,15 +439,15 @@ export function Income() {
                     >
                       {i === 0 && (
                         <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
-                          Hoy
+                          {t('common.today')}
                         </span>
                       )}
                     </div>
                   ))}
                 </div>
                 <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                  <span>Esta semana</span>
-                  <span>8 semanas atrás</span>
+                  <span>{t('income.thisWeek')}</span>
+                  <span>{t('common.weeksAgoShort', { count: 8 })}</span>
                 </div>
               </div>
             </div>
@@ -457,49 +462,49 @@ export function Income() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Comisiones de la Semana
+            {t('income.commissionsThisWeek')}
           </CardTitle>
           <CardDescription>
-            Semana del {formatWeekDate(mockWeeklyCommissions.weekDate)}
+            {t('income.weekOf', { date: formatWeekDate(mockWeeklyCommissions.weekDate) })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-4">
             <div className="rounded-lg bg-gradient-to-br from-green-500 to-green-600 p-4 text-white">
-              <div className="text-sm opacity-90">Total Esta Semana</div>
+              <div className="text-sm opacity-90">{t('income.totalThisWeek')}</div>
               <div className="text-3xl font-bold">${mockWeeklyCommissions.total.toFixed(2)}</div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-2 w-2 rounded-full bg-green-500" />
-                De Hijos (8%)
+                {t('income.fromChildren')}
               </div>
               <div className="text-2xl font-bold">${mockWeeklyCommissions.byLevel.hijos.total.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.hijos.salesCount} ventas</div>
+              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.hijos.salesCount} {t('income.sales')}</div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-2 w-2 rounded-full bg-purple-500" />
-                De Nietos (12%)
+                {t('income.fromGrandchildren')}
               </div>
               <div className="text-2xl font-bold">${mockWeeklyCommissions.byLevel.nietos.total.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.nietos.salesCount} ventas</div>
+              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.nietos.salesCount} {t('income.sales')}</div>
             </div>
             <div className="rounded-lg border p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <div className="h-2 w-2 rounded-full bg-orange-500" />
-                De Bisnietos (20%)
+                {t('income.fromGreatGrandchildren')}
               </div>
               <div className="text-2xl font-bold">${mockWeeklyCommissions.byLevel.bisnietos.total.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.bisnietos.salesCount} ventas</div>
+              <div className="text-xs text-muted-foreground">{mockWeeklyCommissions.byLevel.bisnietos.salesCount} {t('income.sales')}</div>
             </div>
           </div>
 
           {/* Commission entries table */}
           <div>
             <div className="mb-4 flex items-center gap-2">
-              <span className="text-sm font-medium">Filtrar:</span>
+              <span className="text-sm font-medium">{t('common.filterBy')}:</span>
               {(['all', 'HIJO', 'NIETO', 'BISNIETO'] as const).map((filter) => (
                 <button
                   key={filter}
@@ -510,7 +515,7 @@ export function Income() {
                       : 'bg-muted hover:bg-muted/80'
                   }`}
                 >
-                  {filter === 'all' ? 'Todos' : getRelationshipConfig(filter).label + 's'}
+                  {filter === 'all' ? t('common.all') : getRelationshipConfig(filter, t).label + 's'}
                 </button>
               ))}
             </div>
@@ -518,17 +523,17 @@ export function Income() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Vendedor</TableHead>
-                  <TableHead>Relación</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Venta</TableHead>
-                  <TableHead className="text-right">Comisión</TableHead>
-                  <TableHead className="text-center">Cadena</TableHead>
+                  <TableHead>{t('income.seller')}</TableHead>
+                  <TableHead>{t('income.relationship')}</TableHead>
+                  <TableHead>{t('income.customer')}</TableHead>
+                  <TableHead className="text-right">{t('income.sale')}</TableHead>
+                  <TableHead className="text-right">{t('income.commission')}</TableHead>
+                  <TableHead className="text-center">{t('income.chain')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredEntries.map((entry) => {
-                  const config = getRelationshipConfig(entry.relationship)
+                  const config = getRelationshipConfig(entry.relationship, t)
                   return (
                     <TableRow key={entry.id} className={!entry.chainValid ? 'opacity-50' : ''}>
                       <TableCell className="font-medium">{entry.sourceAgent}</TableCell>
@@ -569,8 +574,8 @@ export function Income() {
       {/* ========================================================================= */}
       <Card>
         <CardHeader>
-          <CardTitle>Historial de Comisiones</CardTitle>
-          <CardDescription>Últimas 12 semanas</CardDescription>
+          <CardTitle>{t('income.commissionsHistory')}</CardTitle>
+          <CardDescription>{t('income.last12Weeks')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Bar Chart */}
@@ -597,12 +602,12 @@ export function Income() {
                       <div className="rounded bg-popover px-2 py-1 text-xs shadow-lg whitespace-nowrap">
                         <div className="font-medium">{formatWeekDate(week.weekDate)}</div>
                         {noLlave ? (
-                          <div className="text-red-500">Sin Llave</div>
+                          <div className="text-red-500">{t('llave.noLlave')}</div>
                         ) : (
                           <>
-                            <div>Total: ${week.total.toFixed(2)}</div>
+                            <div>{t('common.total')}: ${week.total.toFixed(2)}</div>
                             <div className="text-muted-foreground">
-                              H: ${week.hijos} | N: ${week.nietos} | B: ${week.bisnietos}
+                              {t('income.childrenShort')}: ${week.hijos} | {t('income.grandchildrenShort')}: ${week.nietos} | {t('income.greatGrandchildrenShort')}: ${week.bisnietos}
                             </div>
                           </>
                         )}
@@ -610,7 +615,7 @@ export function Income() {
                     </div>
                     {i === 0 && (
                       <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
-                        Hoy
+                        {t('common.today')}
                       </div>
                     )}
                   </div>
@@ -618,8 +623,8 @@ export function Income() {
               })}
             </div>
             <div className="flex justify-between text-xs text-muted-foreground pt-4">
-              <span>Esta semana</span>
-              <span>12 semanas atrás</span>
+              <span>{t('income.thisWeek')}</span>
+              <span>{t('income.weeksAgo', { count: 12 })}</span>
             </div>
           </div>
 
@@ -627,11 +632,11 @@ export function Income() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Semana</TableHead>
-                <TableHead className="text-right">De Hijos</TableHead>
-                <TableHead className="text-right">De Nietos</TableHead>
-                <TableHead className="text-right">De Bisnietos</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead>{t('income.week')}</TableHead>
+                <TableHead className="text-right">{t('income.fromChildren')}</TableHead>
+                <TableHead className="text-right">{t('income.fromGrandchildren')}</TableHead>
+                <TableHead className="text-right">{t('income.fromGreatGrandchildren')}</TableHead>
+                <TableHead className="text-right">{t('common.total')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -643,7 +648,7 @@ export function Income() {
                   <TableCell className="text-right">${week.bisnietos.toFixed(2)}</TableCell>
                   <TableCell className="text-right font-bold">
                     {week.total === 0 ? (
-                      <span className="text-red-500">Sin Llave</span>
+                      <span className="text-red-500">{t('llave.noLlave')}</span>
                     ) : (
                       <span className="text-green-600">${week.total.toFixed(2)}</span>
                     )}
@@ -662,10 +667,10 @@ export function Income() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Cadenas Activas
+            {t('income.activeChains')}
           </CardTitle>
           <CardDescription>
-            Visualiza el estado de las cadenas en tu comunidad. Las comisiones solo fluyen a través de cadenas completas donde todos tienen la Llave.
+            {t('income.chainsDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -674,13 +679,13 @@ export function Income() {
             <div className="rounded-lg border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-4">
               <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                 <Link2Off className="h-5 w-5" />
-                <span className="font-medium">Comisiones perdidas por cadenas rotas</span>
+                <span className="font-medium">{t('income.lostCommissionsTitle')}</span>
               </div>
               <div className="mt-2 text-2xl font-bold text-amber-600">
-                ${totalPotentialLost.toFixed(2)} / semana
+                ${totalPotentialLost.toFixed(2)} / {t('income.week')}
               </div>
               <p className="mt-1 text-sm text-amber-600/80">
-                Podrías ganar esto adicional si todos los miembros marcados en rojo obtienen su Llave del Reino.
+                {t('income.lostCommissionsDescription')}
               </p>
             </div>
           )}
@@ -689,23 +694,23 @@ export function Income() {
           <div className="flex flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-green-500" />
-              <span>Cadena activa (tiene Llave)</span>
+              <span>{t('income.activeChainLegend')}</span>
             </div>
             <div className="flex items-center gap-2">
               <Link2Off className="h-4 w-4 text-red-500" />
-              <span>Cadena rota (sin Llave)</span>
+              <span>{t('income.brokenChainLegend')}</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-green-500" />
-              <span>Hijo (8%)</span>
+              <span>{t('income.childRelation')} (8%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-purple-500" />
-              <span>Nieto (12%)</span>
+              <span>{t('income.grandchildRelation')} (12%)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-orange-500" />
-              <span>Bisnieto (20%)</span>
+              <span>{t('income.greatGrandchildRelation')} (20%)</span>
             </div>
           </div>
 
@@ -718,12 +723,12 @@ export function Income() {
 
           {/* Chain rules reminder */}
           <div className="rounded-lg bg-muted/50 p-4 text-sm">
-            <div className="font-medium mb-2">Reglas de Cadena</div>
+            <div className="font-medium mb-2">{t('income.chainRulesTitle')}</div>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• <strong>Hijo:</strong> Recibes 8% si TÚ tienes Llave</li>
-              <li>• <strong>Nieto:</strong> Recibes 12% si TÚ y el HIJO intermedio tienen Llave</li>
-              <li>• <strong>Bisnieto:</strong> Recibes 20% si TÚ, el HIJO y el NIETO intermedios tienen Llave</li>
-              <li>• <strong>Tataranieto+:</strong> Nunca recibes comisiones (máximo 3 niveles)</li>
+              <li>• <strong>{t('income.childRelation')}:</strong> {t('income.childRule')}</li>
+              <li>• <strong>{t('income.grandchildRelation')}:</strong> {t('income.grandchildRule')}</li>
+              <li>• <strong>{t('income.greatGrandchildRelation')}:</strong> {t('income.greatGrandchildRule')}</li>
+              <li>• <strong>{t('income.greatGreatGrandchild')}:</strong> {t('income.greatGreatGrandchildRule')}</li>
             </ul>
           </div>
         </CardContent>

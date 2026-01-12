@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -6,6 +7,7 @@ import {
   Users,
   Megaphone,
   User,
+  Trophy,
   LogOut,
   Menu,
   X,
@@ -22,26 +24,27 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useState } from 'react'
 
-// Agent navigation items
-const agentNavItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/sales', icon: ShoppingCart, label: 'Ventas' },
-  { to: '/income', icon: DollarSign, label: 'Ingresos' },
-  { to: '/team', icon: Users, label: 'Mi Equipo' },
-  { to: '/campaigns', icon: Megaphone, label: 'Campañas' },
-  { to: '/profile', icon: User, label: 'Perfil' },
+// Navigation item definitions (labels will be translated)
+const agentNavKeys = [
+  { to: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { to: '/sales', icon: ShoppingCart, labelKey: 'nav.sales' },
+  { to: '/income', icon: DollarSign, labelKey: 'nav.income' },
+  { to: '/team', icon: Users, labelKey: 'nav.team' },
+  { to: '/campaigns', icon: Megaphone, labelKey: 'nav.campaigns' },
+  { to: '/trophies', icon: Trophy, labelKey: 'nav.trophies' },
+  { to: '/profile', icon: User, labelKey: 'nav.profile' },
 ]
 
-// Admin navigation items (when viewing as admin)
-const adminNavItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard Global' },
-  { to: '/admin/users', icon: Users, label: 'Usuarios' },
-  { to: '/admin/mundo', icon: Globe, label: 'Mundo' },
-  { to: '/admin/campaigns', icon: Megaphone, label: 'Campañas', placeholder: true },
-  { to: '/admin/reports', icon: FileBarChart, label: 'Reportes', placeholder: true },
+const adminNavKeys = [
+  { to: '/admin', icon: LayoutDashboard, labelKey: 'admin.globalDashboard' },
+  { to: '/admin/users', icon: Users, labelKey: 'admin.users' },
+  { to: '/admin/mundo', icon: Globe, labelKey: 'nav.world' },
+  { to: '/admin/campaigns', icon: Megaphone, labelKey: 'nav.campaigns' },
+  { to: '/admin/reports', icon: FileBarChart, labelKey: 'admin.weeklyReport', placeholder: true },
 ]
 
 export function Sidebar() {
+  const { t } = useTranslation()
   const { user, isAdmin, isImpersonating, impersonatedUser, stopImpersonation, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'admin' | 'agent'>('admin')
@@ -56,12 +59,12 @@ export function Sidebar() {
   const NavItem = ({
     to,
     icon: Icon,
-    label,
+    labelKey,
     placeholder = false,
   }: {
     to: string
     icon: typeof LayoutDashboard
-    label: string
+    labelKey: string
     placeholder?: boolean
   }) => (
     <NavLink
@@ -84,10 +87,10 @@ export function Sidebar() {
       }
     >
       <Icon className="h-4 w-4" />
-      {label}
+      {t(labelKey)}
       {placeholder && (
         <Badge variant="outline" className="ml-auto text-[10px] px-1 py-0">
-          Pronto
+          {t('common.loading').replace('...', '')}
         </Badge>
       )}
     </NavLink>
@@ -100,7 +103,7 @@ export function Sidebar() {
         <span className="text-xl font-bold text-primary">Pakoa</span>
         {isAdmin && !isImpersonating && (
           <Badge variant={effectiveViewMode === 'admin' ? 'default' : 'secondary'} className="text-xs">
-            {effectiveViewMode === 'admin' ? 'Admin' : 'Usuario'}
+            {effectiveViewMode === 'admin' ? 'Admin' : t('admin.users')}
           </Badge>
         )}
       </div>
@@ -130,7 +133,7 @@ export function Sidebar() {
           <div className="mt-3 rounded-md bg-amber-500/10 p-2 border border-amber-500/30">
             <div className="flex items-center gap-2 text-amber-600">
               <Eye className="h-4 w-4" />
-              <span className="text-xs font-medium">Viendo como usuario</span>
+              <span className="text-xs font-medium">{t('admin.viewingAs')}</span>
             </div>
             <Button
               variant="ghost"
@@ -138,7 +141,7 @@ export function Sidebar() {
               className="mt-2 w-full h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-500/20"
               onClick={stopImpersonation}
             >
-              Salir de vista de usuario
+              {t('admin.exitImpersonation')}
             </Button>
           </div>
         )}
@@ -152,7 +155,7 @@ export function Sidebar() {
             onClick={() => setViewMode(viewMode === 'admin' ? 'agent' : 'admin')}
           >
             <ChevronRight className="h-3 w-3 mr-1" />
-            {viewMode === 'admin' ? 'Ver como Usuario' : 'Ver como Admin'}
+            {viewMode === 'admin' ? t('admin.viewAsUser') : t('admin.title')}
           </Button>
         )}
       </div>
@@ -163,18 +166,18 @@ export function Sidebar() {
           <>
             <p className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
               <Shield className="h-3 w-3" />
-              Administración
+              {t('admin.title')}
             </p>
-            {adminNavItems.map((item) => (
+            {adminNavKeys.map((item) => (
               <NavItem key={item.to} {...item} />
             ))}
           </>
         ) : (
           <>
             <p className="mb-2 px-3 text-xs font-semibold uppercase text-muted-foreground">
-              Principal
+              {t('nav.dashboard')}
             </p>
-            {agentNavItems.map((item) => (
+            {agentNavKeys.map((item) => (
               <NavItem key={item.to} {...item} />
             ))}
           </>
@@ -189,7 +192,7 @@ export function Sidebar() {
           onClick={logout}
         >
           <LogOut className="h-4 w-4" />
-          Cerrar Sesión
+          {t('nav.logout')}
         </Button>
       </div>
     </>

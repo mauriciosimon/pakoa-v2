@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Card,
   CardContent,
@@ -65,14 +66,7 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-// Funnel config
-const funnelConfig: Record<FunnelStatus, { label: string; color: string; bgColor: string; icon: typeof Clock }> = {
-  PROSPECTO: { label: 'Prospectos', color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: FileText },
-  COTIZADO: { label: 'Cotizados', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: DollarSign },
-  AGENDADO: { label: 'Agendados', color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: Calendar },
-  INSTALADO: { label: 'Instalados', color: 'text-green-400', bgColor: 'bg-green-500/20', icon: CheckCircle },
-  CANCELADO: { label: 'Cancelados', color: 'text-red-400', bgColor: 'bg-red-500/20', icon: XCircle },
-}
+// Funnel config (labels will be translated dynamically in component)
 
 // Team member type for display
 interface TeamMemberDisplay {
@@ -86,6 +80,7 @@ interface TeamMemberDisplay {
 }
 
 export function Dashboard() {
+  const { t } = useTranslation()
   const { effectiveUser } = useAuth()
   const [teamFilter, setTeamFilter] = useState<'all' | 'hijo' | 'nieto' | 'bisnieto' | 'tataranieto'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'at-risk'>('all')
@@ -93,6 +88,15 @@ export function Dashboard() {
   const [expandedSale, setExpandedSale] = useState<string | null>(null)
   const [kanbanStartDate, setKanbanStartDate] = useState<string>('')
   const [kanbanEndDate, setKanbanEndDate] = useState<string>('')
+
+  // Funnel config with translations
+  const funnelConfig: Record<FunnelStatus, { label: string; color: string; bgColor: string; icon: typeof Clock }> = {
+    PROSPECTO: { label: t('sales.prospectos'), color: 'text-blue-400', bgColor: 'bg-blue-500/20', icon: FileText },
+    COTIZADO: { label: t('sales.cotizados'), color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', icon: DollarSign },
+    AGENDADO: { label: t('sales.agendados'), color: 'text-purple-400', bgColor: 'bg-purple-500/20', icon: Calendar },
+    INSTALADO: { label: t('sales.instalados'), color: 'text-green-400', bgColor: 'bg-green-500/20', icon: CheckCircle },
+    CANCELADO: { label: t('sales.cancelados'), color: 'text-red-400', bgColor: 'bg-red-500/20', icon: XCircle },
+  }
 
   // Get the current user's data from the centralized mock data
   const currentUserData = useMemo(() => {
@@ -233,10 +237,10 @@ export function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Dashboard de Ventas
+          {t('dashboard.title')}
         </h1>
         <p className="text-muted-foreground">
-          Bienvenido, {effectiveUser?.name.split(' ')[0]} - Aquí tienes tu resumen de KPIs y rendimiento
+          {t('dashboard.welcome', { name: effectiveUser?.name.split(' ')[0] })}
         </p>
       </div>
 
@@ -248,10 +252,10 @@ export function Dashboard() {
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Ventas 30 Días
+                {t('sales.sales30Days')}
               </span>
               <Badge variant={isActive ? 'success' : 'destructive'} className="text-sm">
-                {isActive ? 'ACTIVO' : 'INACTIVO'}
+                {isActive ? t('llave.active') : t('llave.inactive')}
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -261,7 +265,7 @@ export function Dashboard() {
             </div>
             <div className="mt-3 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Meta: $15,000 (Llave del Reino)</span>
+                <span className="text-muted-foreground">{t('llave.goal')}</span>
                 <span className={isActive ? 'text-green-400' : 'text-red-400'}>
                   {progressToThreshold.toFixed(0)}%
                 </span>
@@ -273,7 +277,7 @@ export function Dashboard() {
             </div>
             <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>Próxima evaluación en <strong className="text-foreground">{daysUntilEval} días</strong> (Miércoles)</span>
+              <span>{t('llave.nextEvaluation', { days: daysUntilEval })}</span>
             </div>
           </CardContent>
         </Card>
@@ -281,13 +285,13 @@ export function Dashboard() {
         {/* Ventas esta semana */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Ventas Esta Semana</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('sales.salesThisWeek')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(ventasEstaSemana)}</div>
             <div className={`flex items-center gap-1 text-sm ${Number(weekChange) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {Number(weekChange) >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingUp className="h-4 w-4 rotate-180" />}
-              {weekChange}% vs semana pasada
+              {weekChange}% {t('sales.vsLastWeek')}
             </div>
           </CardContent>
         </Card>
@@ -295,11 +299,11 @@ export function Dashboard() {
         {/* Ventas semana pasada */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Ventas Semana Pasada</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('sales.salesLastWeek')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(ventasSemanaPasada)}</div>
-            <p className="text-sm text-muted-foreground">Referencia comparativa</p>
+            <p className="text-sm text-muted-foreground">{t('sales.referenceComparative')}</p>
           </CardContent>
         </Card>
       </div>
@@ -311,15 +315,15 @@ export function Dashboard() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
-                Mi Embudo de Ventas
+                {t('sales.myFunnel')}
               </CardTitle>
-              <CardDescription>Tablero Kanban de ventas en proceso</CardDescription>
+              <CardDescription>{t('sales.funnelDesc')}</CardDescription>
             </div>
             {/* Date Filters */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Desde:</span>
+                <span className="text-sm text-muted-foreground">{t('common.from')}:</span>
                 <Input
                   type="date"
                   value={kanbanStartDate}
@@ -328,7 +332,7 @@ export function Dashboard() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Hasta:</span>
+                <span className="text-sm text-muted-foreground">{t('common.to')}:</span>
                 <Input
                   type="date"
                   value={kanbanEndDate}
@@ -344,7 +348,7 @@ export function Dashboard() {
                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-4 w-4 mr-1" />
-                  Limpiar
+                  {t('common.clear')}
                 </Button>
               )}
             </div>
@@ -353,7 +357,7 @@ export function Dashboard() {
             <div className="mt-2 flex items-center gap-2 text-sm">
               <Badge variant="outline" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
                 <Filter className="h-3 w-3 mr-1" />
-                Filtrado: {kanbanFilteredSales.length} de {userSales.length} ventas
+                {t('dashboard.filtered', { count: kanbanFilteredSales.length, total: userSales.length })}
               </Badge>
             </div>
           )}
@@ -439,7 +443,7 @@ export function Dashboard() {
                     {columnSales.length > (isActiveStage ? 8 : 4) && (
                       <div className="text-center py-2">
                         <span className="text-xs text-muted-foreground">
-                          +{columnSales.length - (isActiveStage ? 8 : 4)} más
+                          {t('common.moreCount', { count: columnSales.length - (isActiveStage ? 8 : 4) })}
                         </span>
                       </div>
                     )}
@@ -448,7 +452,7 @@ export function Dashboard() {
                     {columnSales.length === 0 && (
                       <div className="flex flex-col items-center justify-center h-24 text-muted-foreground">
                         <Icon className="h-8 w-8 mb-2 opacity-30" />
-                        <span className="text-xs">Sin ventas</span>
+                        <span className="text-xs">{t('sales.noSalesInFunnel')}</span>
                       </div>
                     )}
                   </div>
@@ -461,15 +465,15 @@ export function Dashboard() {
           <div className="border-t p-3 bg-muted/30 flex items-center justify-between">
             <div className="flex items-center gap-4 text-sm">
               <span className="text-muted-foreground">
-                <strong className="text-foreground">{kanbanPendingSales.length}</strong> ventas en proceso
+                {t('sales.salesInProcess', { count: kanbanPendingSales.length })}
               </span>
               <span className="text-muted-foreground">
-                Valor potencial: <strong className="text-green-400">{formatCurrency(kanbanPendingSales.reduce((s, sale) => s + sale.amount, 0))}</strong>
+                {t('sales.potentialValue')}: <strong className="text-green-400">{formatCurrency(kanbanPendingSales.reduce((s, sale) => s + sale.amount, 0))}</strong>
               </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>Click en tarjeta para ver detalles</span>
+              <span>{t('sales.clickForDetails')}</span>
             </div>
           </div>
         </CardContent>
@@ -480,9 +484,9 @@ export function Dashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Mi Comunidad
+            {t('team.myCommunity')}
           </CardTitle>
-          <CardDescription>Rendimiento de tu equipo en los últimos 30 días</CardDescription>
+          <CardDescription>{t('team.communityPerformance')}</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Filters */}
@@ -490,23 +494,23 @@ export function Dashboard() {
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={teamFilter} onChange={(e) => setTeamFilter(e.target.value as typeof teamFilter)}>
-                <option value="all">Todos los niveles</option>
-                <option value="hijo">Hijos</option>
-                <option value="nieto">Nietos</option>
-                <option value="bisnieto">Bisnietos</option>
-                <option value="tataranieto">Tataranietos</option>
+                <option value="all">{t('team.allLevels')}</option>
+                <option value="hijo">{t('team.hijos')}</option>
+                <option value="nieto">{t('team.nietos')}</option>
+                <option value="bisnieto">{t('team.bisnietos')}</option>
+                <option value="tataranieto">{t('team.tataranietos')}</option>
               </Select>
             </div>
             <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}>
-              <option value="all">Todos</option>
-              <option value="active">Activos</option>
-              <option value="inactive">Inactivos</option>
-              <option value="at-risk">En riesgo ($12k-$15k)</option>
+              <option value="all">{t('common.all')}</option>
+              <option value="active">{t('team.active')}</option>
+              <option value="inactive">{t('team.inactive')}</option>
+              <option value="at-risk">{t('team.atRisk')}</option>
             </Select>
             <Select value={teamSort} onChange={(e) => setTeamSort(e.target.value as typeof teamSort)}>
-              <option value="sales">Ordenar por ventas</option>
-              <option value="name">Ordenar por nombre</option>
-              <option value="date">Ordenar por última venta</option>
+              <option value="sales">{t('team.sortBySales')}</option>
+              <option value="name">{t('team.sortByName')}</option>
+              <option value="date">{t('team.sortByLastSale')}</option>
             </Select>
           </div>
 
@@ -515,19 +519,19 @@ export function Dashboard() {
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-left p-3 font-medium">Miembro</th>
-                  <th className="text-left p-3 font-medium">Nivel</th>
-                  <th className="text-right p-3 font-medium">Ventas 30d</th>
-                  <th className="text-center p-3 font-medium">Estado</th>
-                  <th className="text-center p-3 font-medium">En proceso</th>
-                  <th className="text-right p-3 font-medium">Última venta</th>
+                  <th className="text-left p-3 font-medium">{t('team.member')}</th>
+                  <th className="text-left p-3 font-medium">{t('team.level')}</th>
+                  <th className="text-right p-3 font-medium">{t('team.sales30d')}</th>
+                  <th className="text-center p-3 font-medium">{t('team.status')}</th>
+                  <th className="text-center p-3 font-medium">{t('team.inProcess')}</th>
+                  <th className="text-right p-3 font-medium">{t('team.lastSale')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTeam.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      No tienes miembros en tu equipo aún
+                      {t('team.noMembers')}
                     </td>
                   </tr>
                 ) : (
@@ -542,19 +546,19 @@ export function Dashboard() {
                           </div>
                         </td>
                         <td className="p-3">
-                          <Badge variant="outline" className="capitalize">{member.level}</Badge>
+                          <Badge variant="outline" className="capitalize">{t(`team.${member.level}`)}</Badge>
                         </td>
                         <td className={`p-3 text-right font-medium ${member.isActive ? 'text-green-400' : 'text-red-400'}`}>
                           {formatCurrency(member.ventas30Dias)}
                         </td>
                         <td className="p-3 text-center">
                           <Badge variant={member.isActive ? 'success' : 'destructive'}>
-                            {member.isActive ? 'Activo' : 'Inactivo'}
+                            {member.isActive ? t('team.active') : t('team.inactive')}
                           </Badge>
                         </td>
                         <td className="p-3 text-center">
                           {member.pendingCount > 0 ? (
-                            <Badge variant="outline">{member.pendingCount} en proceso</Badge>
+                            <Badge variant="outline">{t('team.inProcessCount', { count: member.pendingCount })}</Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -579,19 +583,19 @@ export function Dashboard() {
                 <div className="text-2xl font-bold text-green-400">
                   {teamMembers.filter(m => m.isActive).length}
                 </div>
-                <div className="text-sm text-muted-foreground">Activos</div>
+                <div className="text-sm text-muted-foreground">{t('team.active')}</div>
               </div>
               <div className="rounded-lg bg-red-500/10 p-3">
                 <div className="text-2xl font-bold text-red-400">
                   {teamMembers.filter(m => !m.isActive).length}
                 </div>
-                <div className="text-sm text-muted-foreground">Inactivos</div>
+                <div className="text-sm text-muted-foreground">{t('team.inactive')}</div>
               </div>
               <div className="rounded-lg bg-yellow-500/10 p-3">
                 <div className="text-2xl font-bold text-yellow-400">
                   {teamMembers.filter(m => m.ventas30Dias >= 12000 && m.ventas30Dias < 15000).length}
                 </div>
-                <div className="text-sm text-muted-foreground">En riesgo</div>
+                <div className="text-sm text-muted-foreground">{t('team.atRiskLabel')}</div>
               </div>
             </div>
           )}
@@ -605,9 +609,9 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
-              Ventas Semanales
+              {t('dashboard.weeklySales')}
             </CardTitle>
-            <CardDescription>Últimas 12 semanas de ventas instaladas</CardDescription>
+            <CardDescription>{t('dashboard.weeklySalesDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -632,14 +636,14 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Top Vendedores del Equipo
+              {t('dashboard.topSellers')}
             </CardTitle>
-            <CardDescription>Ranking por ventas en 30 días</CardDescription>
+            <CardDescription>{t('dashboard.topSellersDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {teamMembers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No tienes miembros en tu equipo aún
+                {t('team.noMembers')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -658,7 +662,7 @@ export function Dashboard() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium">{member.name}</p>
-                        <p className="text-sm text-muted-foreground capitalize">{member.level}</p>
+                        <p className="text-sm text-muted-foreground capitalize">{t(`team.${member.level}`)}</p>
                       </div>
                       <span className="font-bold text-green-400">{formatCurrency(member.ventas30Dias)}</span>
                     </div>
@@ -673,9 +677,9 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
-              Ventas por Producto
+              {t('dashboard.salesByProduct')}
             </CardTitle>
-            <CardDescription>Distribución de ventas instaladas por tipo de producto</CardDescription>
+            <CardDescription>{t('dashboard.salesByProductDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-5 gap-4">

@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Card,
   CardContent,
@@ -10,30 +12,54 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/AuthContext'
-import { User, Mail, Phone, Calendar, Shield, Trophy } from 'lucide-react'
-
-// Mock achievements
-const mockUserAchievements = [
-  { name: 'Primera Venta', icon: '🎯', earnedAt: '2024-01-15' },
-  { name: 'Activado', icon: '⚡', earnedAt: '2024-02-01' },
-  { name: 'Club 5K', icon: '💎', earnedAt: '2024-06-15' },
-]
+import { User, Mail, Phone, Calendar, Shield, Trophy, ChevronRight } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { TrophyCard } from '@/components/trophies/TrophyCard'
+import { getAllTrophies, getUserTrophies, getTrophyCount } from '@/data/trophies'
 
 export function Profile() {
-  const { user } = useAuth()
+  const { user, effectiveUser } = useAuth()
+  const { t } = useTranslation()
 
-  const initials = user?.name
+  const displayUser = effectiveUser || user
+
+  const initials = displayUser?.name
     .split(' ')
     .map((n) => n[0])
     .join('')
+
+  // Get user's trophies
+  const allTrophies = useMemo(() => getAllTrophies(), [])
+  const userTrophyList = useMemo(
+    () => (displayUser ? getUserTrophies(displayUser.id) : []),
+    [displayUser]
+  )
+  const trophyCounts = useMemo(
+    () => (displayUser ? getTrophyCount(displayUser.id) : { earned: 0, total: 13 }),
+    [displayUser]
+  )
+
+  // Create a map of user trophies for quick lookup
+  const userTrophyMap = useMemo(() => {
+    const map = new Map<string, typeof userTrophyList[0]>()
+    userTrophyList.forEach(ut => map.set(ut.trophyId, ut))
+    return map
+  }, [userTrophyList])
+
+  // Get earned trophies for display (up to 5)
+  const earnedTrophies = useMemo(() => {
+    return allTrophies
+      .filter(t => userTrophyMap.has(t.id))
+      .slice(0, 5)
+  }, [allTrophies, userTrophyMap])
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Mi Perfil</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('profile.title')}</h1>
         <p className="text-muted-foreground">
-          Gestiona tu información personal y configuración
+          {t('profile.subtitle')}
         </p>
       </div>
 
@@ -43,22 +69,22 @@ export function Profile() {
           <CardHeader className="text-center">
             <div className="mx-auto mb-4">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={user?.avatarUrl} />
+                <AvatarImage src={displayUser?.avatarUrl} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
             </div>
-            <CardTitle>{user?.name}</CardTitle>
-            <CardDescription>{user?.email}</CardDescription>
+            <CardTitle>{displayUser?.name}</CardTitle>
+            <CardDescription>{displayUser?.email}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-center gap-2">
-              <Badge variant={user?.isActive ? 'success' : 'secondary'}>
-                {user?.isActive ? 'Cuenta Activa' : 'Por Activar'}
+              <Badge variant={displayUser?.isActive ? 'success' : 'secondary'}>
+                {displayUser?.isActive ? t('profile.accountActive') : t('profile.accountPending')}
               </Badge>
-              {user?.role === 'admin' && (
+              {displayUser?.role === 'admin' && (
                 <Badge variant="default">
                   <Shield className="mr-1 h-3 w-3" />
-                  Admin
+                  {t('admin.title')}
                 </Badge>
               )}
             </div>
@@ -66,25 +92,26 @@ export function Profile() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                Miembro desde{' '}
-                {user?.createdAt
-                  ? new Date(user.createdAt).toLocaleDateString('es-MX', {
-                      year: 'numeric',
-                      month: 'long',
-                    })
-                  : 'N/A'}
+                {t('profile.memberSince', {
+                  date: displayUser?.createdAt
+                    ? new Date(displayUser.createdAt).toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'long',
+                      })
+                    : 'N/A'
+                })}
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Trophy className="h-4 w-4" />
-                {mockUserAchievements.length} logros obtenidos
+                {t('profile.achievementsCount', { count: trophyCounts.earned })}
               </div>
             </div>
 
             <div className="rounded-lg bg-muted p-4 text-center">
               <p className="text-2xl font-bold text-primary">
-                ${user?.totalRevenue?.toLocaleString() || 0}
+                ${displayUser?.totalRevenue?.toLocaleString() || 0}
               </p>
-              <p className="text-sm text-muted-foreground">Ingresos totales</p>
+              <p className="text-sm text-muted-foreground">{t('profile.totalEarnings')}</p>
             </div>
           </CardContent>
         </Card>
@@ -94,101 +121,117 @@ export function Profile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              Información Personal
+              {t('profile.personalInfo')}
             </CardTitle>
             <CardDescription>
-              Actualiza tu información de contacto
+              {t('profile.personalInfoDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nombre Completo</label>
+                  <label className="text-sm font-medium">{t('profile.fullName')}</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       className="pl-9"
-                      defaultValue={user?.name}
-                      placeholder="Tu nombre"
+                      defaultValue={displayUser?.name}
+                      placeholder={t('profile.yourName')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    Correo Electrónico
+                    {t('profile.emailAddress')}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       className="pl-9"
                       type="email"
-                      defaultValue={user?.email}
-                      placeholder="tu@email.com"
+                      defaultValue={displayUser?.email}
+                      placeholder={t('profile.emailPlaceholder')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Teléfono</label>
+                  <label className="text-sm font-medium">{t('common.phone')}</label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       className="pl-9"
-                      defaultValue={user?.phone || ''}
-                      placeholder="+52 555 123 4567"
+                      defaultValue={displayUser?.phone || ''}
+                      placeholder={t('sales.phonePlaceholder')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    URL de Avatar (opcional)
+                    {t('profile.avatarUrl')}
                   </label>
                   <Input
-                    defaultValue={user?.avatarUrl || ''}
-                    placeholder="https://..."
+                    defaultValue={displayUser?.avatarUrl || ''}
+                    placeholder={t('profile.avatarUrlPlaceholder')}
                   />
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit">Guardar Cambios</Button>
+                <Button type="submit">{t('common.saveChanges')}</Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
-        {/* Achievements */}
+        {/* Trophies Section */}
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trophy className="h-5 w-5" />
-              Mis Logros
-            </CardTitle>
-            <CardDescription>Badges y reconocimientos obtenidos</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  {t('trophies.title')}
+                </CardTitle>
+                <CardDescription>
+                  {trophyCounts.earned}/{trophyCounts.total} {t('trophies.unlocked')}
+                </CardDescription>
+              </div>
+              <Link to="/trophies">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  {t('trophies.viewAll')}
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {mockUserAchievements.map((achievement) => (
-                <div
-                  key={achievement.name}
-                  className="flex items-center gap-4 rounded-lg border p-4"
-                >
-                  <span className="text-4xl">{achievement.icon}</span>
-                  <div>
-                    <p className="font-medium">{achievement.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Obtenido el{' '}
-                      {new Date(achievement.earnedAt).toLocaleDateString(
-                        'es-MX'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {earnedTrophies.length > 0 ? (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+                {earnedTrophies.map(trophy => (
+                  <TrophyCard
+                    key={trophy.id}
+                    trophy={trophy}
+                    userTrophy={userTrophyMap.get(trophy.id)}
+                    size="sm"
+                    showDetails={false}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <p>{t('profile.noTrophiesYet')}</p>
+                <Link to="/trophies">
+                  <Button variant="link" size="sm">
+                    {t('trophies.viewAll')}
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -197,10 +240,10 @@ export function Profile() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Seguridad
+              {t('profile.security')}
             </CardTitle>
             <CardDescription>
-              Configura tu contraseña y opciones de seguridad
+              {t('profile.securityDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -208,24 +251,24 @@ export function Profile() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    Contraseña Actual
+                    {t('profile.currentPassword')}
                   </label>
                   <Input type="password" placeholder="••••••••" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Nueva Contraseña</label>
+                  <label className="text-sm font-medium">{t('profile.newPassword')}</label>
                   <Input type="password" placeholder="••••••••" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
-                    Confirmar Contraseña
+                    {t('profile.confirmPassword')}
                   </label>
                   <Input type="password" placeholder="••••••••" />
                 </div>
               </div>
               <div className="flex justify-end">
                 <Button type="submit" variant="outline">
-                  Cambiar Contraseña
+                  {t('profile.changePassword')}
                 </Button>
               </div>
             </form>

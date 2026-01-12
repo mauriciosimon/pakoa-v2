@@ -1982,3 +1982,1017 @@ export const getAllSales = (): Sale[] => {
   allSalesMap.forEach(sales => allSales.push(...sales))
   return allSales
 }
+
+// ============================================================
+// CAMPAIGNS MODULE
+// ============================================================
+
+import type {
+  Campaign,
+  CampaignWeeklySnapshot,
+  CampaignParticipant,
+  CampaignStatus,
+  ParticipantRole
+} from '@/types'
+
+// Campaign constants
+export const CAMPAIGN_BUDGET_CAP = 800
+export const CAMPAIGN_INITIAL_BUDGET = 200
+export const CAMPAIGN_DIVISOR = 2.5
+export const CAMPAIGN_INITIAL_PERIOD_WEEKS = 2
+export const CAMPAIGN_MAX_PARTICIPANTS = 4
+
+// Helper to calculate weekly budget
+// The $800 cap applies to the TOTAL budget (own sales budget + overflow received)
+// Any excess over $800 flows to the next campaign in the chain
+export function calculateWeeklyBudget(
+  totalSales: number,
+  isInitialPeriod: boolean,
+  overflowIn: number
+): { baseBudget: number; cappedBudget: number; overflowOut: number; totalBudget: number } {
+  // Base budget from own sales (or $200 if in initial period)
+  const baseBudget = isInitialPeriod ? CAMPAIGN_INITIAL_BUDGET : totalSales / CAMPAIGN_DIVISOR
+
+  // Total incoming = own budget + overflow from parent campaign
+  const totalIncoming = baseBudget + overflowIn
+
+  // Cap total at $800, overflow the rest to next campaign
+  const totalBudget = Math.min(totalIncoming, CAMPAIGN_BUDGET_CAP)
+  const overflowOut = Math.max(0, totalIncoming - CAMPAIGN_BUDGET_CAP)
+
+  // cappedBudget represents the "own" portion that's capped (for display purposes)
+  const cappedBudget = Math.min(baseBudget, CAMPAIGN_BUDGET_CAP)
+
+  return {
+    baseBudget: Math.round(baseBudget * 100) / 100,
+    cappedBudget: Math.round(cappedBudget * 100) / 100,
+    overflowOut: Math.round(overflowOut * 100) / 100,
+    totalBudget: Math.round(totalBudget * 100) / 100
+  }
+}
+
+// Week dates for snapshots (8 weeks of history, Wednesdays)
+const campaignWeekDates = [
+  '2024-12-18', '2024-12-11', '2024-12-04', '2024-11-27',
+  '2024-11-20', '2024-11-13', '2024-11-06', '2024-10-30'
+]
+
+/**
+ * Mock Campaigns
+ *
+ * Manually defined campaigns for users with special scenarios:
+ * - María García: 1 campaign, consistent performer, no overflow
+ * - Patricia Navarro: 2-campaign chain, high sales trigger overflow
+ * - Roberto Mendoza: 3-campaign chain, very high performer with deep cascade
+ * - Carlos Rodríguez: 1 campaign, moderate performer
+ * - Ana Martínez: 1 campaign, moderate performer
+ *
+ * All other Llave holders get auto-generated campaigns below.
+ */
+const manualCampaigns: Campaign[] = [
+  // María García - Single campaign, no overflow (sales ~$1800/week = $720 budget)
+  {
+    id: 'campaign-maria-1',
+    ownerId: 'user-maria',
+    ownerName: 'María García',
+    name: 'Campaña 1',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-16T00:00:00Z',
+    initialPeriodEndsAt: '2024-10-30T00:00:00Z',
+    parentCampaignId: null,
+    childCampaignId: null,
+    chainPosition: 1
+  },
+
+  // Patricia Navarro - 2 campaign chain (high sales ~$2200/week = $880 budget, overflows $80)
+  {
+    id: 'campaign-patricia-1',
+    ownerId: 'user-patricia',
+    ownerName: 'Patricia Navarro',
+    name: 'Campaña 1',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-09T00:00:00Z',
+    initialPeriodEndsAt: '2024-10-23T00:00:00Z',
+    parentCampaignId: null,
+    childCampaignId: 'campaign-patricia-2',
+    chainPosition: 1
+  },
+  {
+    id: 'campaign-patricia-2',
+    ownerId: 'user-patricia',
+    ownerName: 'Patricia Navarro',
+    name: 'Campaña 2',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-11-06T00:00:00Z',
+    initialPeriodEndsAt: '2024-11-20T00:00:00Z',
+    parentCampaignId: 'campaign-patricia-1',
+    childCampaignId: null,
+    chainPosition: 2
+  },
+
+  // Roberto Mendoza - 3 campaign chain (very high sales ~$2800/week = $1120 budget, significant overflow)
+  {
+    id: 'campaign-roberto-1',
+    ownerId: 'user-roberto',
+    ownerName: 'Roberto Mendoza',
+    name: 'Campaña 1',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-02T00:00:00Z',
+    initialPeriodEndsAt: '2024-10-16T00:00:00Z',
+    parentCampaignId: null,
+    childCampaignId: 'campaign-roberto-2',
+    chainPosition: 1
+  },
+  {
+    id: 'campaign-roberto-2',
+    ownerId: 'user-roberto',
+    ownerName: 'Roberto Mendoza',
+    name: 'Campaña 2',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-23T00:00:00Z',
+    initialPeriodEndsAt: '2024-11-06T00:00:00Z',
+    parentCampaignId: 'campaign-roberto-1',
+    childCampaignId: 'campaign-roberto-3',
+    chainPosition: 2
+  },
+  {
+    id: 'campaign-roberto-3',
+    ownerId: 'user-roberto',
+    ownerName: 'Roberto Mendoza',
+    name: 'Campaña 3',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-11-20T00:00:00Z',
+    initialPeriodEndsAt: '2024-12-04T00:00:00Z',
+    parentCampaignId: 'campaign-roberto-2',
+    childCampaignId: null,
+    chainPosition: 3
+  },
+
+  // Carlos Rodríguez - Single campaign
+  {
+    id: 'campaign-carlos-1',
+    ownerId: 'user-carlos',
+    ownerName: 'Carlos Rodríguez',
+    name: 'Campaña 1',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-23T00:00:00Z',
+    initialPeriodEndsAt: '2024-11-06T00:00:00Z',
+    parentCampaignId: null,
+    childCampaignId: null,
+    chainPosition: 1
+  },
+
+  // Ana Martínez - Single campaign
+  {
+    id: 'campaign-ana-1',
+    ownerId: 'user-ana',
+    ownerName: 'Ana Martínez',
+    name: 'Campaña 1',
+    status: 'ACTIVE' as CampaignStatus,
+    createdAt: '2024-10-30T00:00:00Z',
+    initialPeriodEndsAt: '2024-11-13T00:00:00Z',
+    parentCampaignId: null,
+    childCampaignId: null,
+    chainPosition: 1
+  },
+
+]
+
+// Auto-generate campaigns for all Llave holders who don't have manual campaigns
+// When overflow occurs, next campaign is created IMMEDIATELY (same date)
+// If the overflow cascades (new campaign also overflows), create the next one instantly too
+function generateAutoCampaigns(): Campaign[] {
+  const manualOwnerIds = new Set(manualCampaigns.map(c => c.ownerId))
+  const llaveHolders = mockUsers.filter(u => hasLlave(u.sales30d) && !manualOwnerIds.has(u.id))
+
+  const allCampaigns: Campaign[] = []
+
+  llaveHolders.forEach((user, idx) => {
+    // Stagger Campaign 1 creation dates
+    const campaign1CreatedDate = new Date('2024-10-15')
+    campaign1CreatedDate.setDate(campaign1CreatedDate.getDate() + (idx % 30))
+
+    const campaign1InitialEnd = new Date(campaign1CreatedDate)
+    campaign1InitialEnd.setDate(campaign1InitialEnd.getDate() + 14)
+
+    // Calculate weekly average sales and Campaign 1's floating budget
+    const weeklyAvg = user.sales30d / 4
+    const c1FloatingBudget = weeklyAvg / CAMPAIGN_DIVISOR
+
+    // Does Campaign 1 overflow in floating period?
+    const c1Overflows = c1FloatingBudget > CAMPAIGN_BUDGET_CAP
+    const c1Overflow = Math.max(0, c1FloatingBudget - CAMPAIGN_BUDGET_CAP)
+
+    const campaign1Id = `campaign-auto-${user.id}-1`
+    let campaign2Id: string | null = null
+    let campaign3Id: string | null = null
+    let campaign4Id: string | null = null
+
+    // Campaign 2 is created when Campaign 1 first overflows
+    if (c1Overflows) {
+      campaign2Id = `campaign-auto-${user.id}-2`
+
+      // Campaign 2 created when C1 first overflows (end of C1's initial period)
+      const campaign2CreatedDate = new Date(campaign1InitialEnd)
+      const campaign2InitialEnd = new Date(campaign2CreatedDate)
+      campaign2InitialEnd.setDate(campaign2InitialEnd.getDate() + 14)
+
+      // Campaign 2's total in its first week = initial budget ($200) + overflow from C1
+      // If this exceeds $800, Campaign 3 is created IMMEDIATELY (same date)
+      const c2FirstWeekTotal = CAMPAIGN_INITIAL_BUDGET + c1Overflow
+      const c2Overflows = c2FirstWeekTotal > CAMPAIGN_BUDGET_CAP
+      const c2Overflow = Math.max(0, c2FirstWeekTotal - CAMPAIGN_BUDGET_CAP)
+
+      if (c2Overflows) {
+        campaign3Id = `campaign-auto-${user.id}-3`
+
+        // Campaign 3 created at SAME TIME as Campaign 2 (instant cascade)
+        const campaign3CreatedDate = new Date(campaign2CreatedDate)
+        const campaign3InitialEnd = new Date(campaign3CreatedDate)
+        campaign3InitialEnd.setDate(campaign3InitialEnd.getDate() + 14)
+
+        // Check if Campaign 3 also overflows immediately
+        const c3FirstWeekTotal = CAMPAIGN_INITIAL_BUDGET + c2Overflow
+        const c3Overflows = c3FirstWeekTotal > CAMPAIGN_BUDGET_CAP
+
+        if (c3Overflows) {
+          campaign4Id = `campaign-auto-${user.id}-4`
+
+          // Campaign 4 created at SAME TIME (instant cascade)
+          const campaign4CreatedDate = new Date(campaign3CreatedDate)
+          const campaign4InitialEnd = new Date(campaign4CreatedDate)
+          campaign4InitialEnd.setDate(campaign4InitialEnd.getDate() + 14)
+
+          allCampaigns.push({
+            id: campaign4Id,
+            ownerId: user.id,
+            ownerName: user.name,
+            name: 'Campaña 4',
+            status: 'ACTIVE' as CampaignStatus,
+            createdAt: campaign4CreatedDate.toISOString(),
+            initialPeriodEndsAt: campaign4InitialEnd.toISOString(),
+            parentCampaignId: campaign3Id,
+            childCampaignId: null,
+            chainPosition: 4
+          })
+        }
+
+        allCampaigns.push({
+          id: campaign3Id,
+          ownerId: user.id,
+          ownerName: user.name,
+          name: 'Campaña 3',
+          status: 'ACTIVE' as CampaignStatus,
+          createdAt: campaign3CreatedDate.toISOString(),
+          initialPeriodEndsAt: campaign3InitialEnd.toISOString(),
+          parentCampaignId: campaign2Id,
+          childCampaignId: campaign4Id,
+          chainPosition: 3
+        })
+      }
+
+      allCampaigns.push({
+        id: campaign2Id,
+        ownerId: user.id,
+        ownerName: user.name,
+        name: 'Campaña 2',
+        status: 'ACTIVE' as CampaignStatus,
+        createdAt: campaign2CreatedDate.toISOString(),
+        initialPeriodEndsAt: campaign2InitialEnd.toISOString(),
+        parentCampaignId: campaign1Id,
+        childCampaignId: campaign3Id,
+        chainPosition: 2
+      })
+    }
+
+    // Add Campaign 1 (always exists for Llave holders)
+    allCampaigns.push({
+      id: campaign1Id,
+      ownerId: user.id,
+      ownerName: user.name,
+      name: 'Campaña 1',
+      status: 'ACTIVE' as CampaignStatus,
+      createdAt: campaign1CreatedDate.toISOString(),
+      initialPeriodEndsAt: campaign1InitialEnd.toISOString(),
+      parentCampaignId: null,
+      childCampaignId: campaign2Id,
+      chainPosition: 1
+    })
+  })
+
+  return allCampaigns
+}
+
+// Combine manual and auto-generated campaigns
+export const mockCampaigns: Campaign[] = [...manualCampaigns, ...generateAutoCampaigns()]
+
+// Generate weekly snapshots for campaigns
+function generateCampaignSnapshots(): CampaignWeeklySnapshot[] {
+  const snapshots: CampaignWeeklySnapshot[] = []
+
+  // María - consistent ~$1800/week, no overflow
+  const mariaSalesProfile = [1850, 1720, 1900, 1650, 1800, 1750, 1880, 1700]
+  mariaSalesProfile.forEach((sales, idx) => {
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 6 // Weeks 7-8 were initial period
+    const budget = calculateWeeklyBudget(sales, isInitial, 0)
+    snapshots.push({
+      id: `snapshot-maria-1-${idx}`,
+      campaignId: 'campaign-maria-1',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn: 0,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Patricia Campaign 1 - high sales with overflow to campaign 2
+  const patriciaSalesProfile1 = [2200, 2350, 2100, 2400, 2150, 2300, 2050, 2250]
+  const patriciaOverflows: number[] = []
+  patriciaSalesProfile1.forEach((sales, idx) => {
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 7 // Week 8 was initial
+    const budget = calculateWeeklyBudget(sales, isInitial, 0)
+    patriciaOverflows.push(budget.overflowOut)
+    snapshots.push({
+      id: `snapshot-patricia-1-${idx}`,
+      campaignId: 'campaign-patricia-1',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn: 0,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Patricia Campaign 2 - receives overflow, has own sales too
+  const patriciaSalesProfile2 = [450, 520, 380, 600, 420, 0, 0, 0] // Created week 5
+  patriciaSalesProfile2.forEach((sales, idx) => {
+    if (idx > 4) return // Campaign didn't exist yet
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 3 // Weeks 4-5 were initial
+    const overflowIn = patriciaOverflows[idx] || 0
+    const budget = calculateWeeklyBudget(sales, isInitial, overflowIn)
+    snapshots.push({
+      id: `snapshot-patricia-2-${idx}`,
+      campaignId: 'campaign-patricia-2',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Roberto Campaign 1 - very high sales, significant overflow
+  const robertoSalesProfile1 = [2850, 3100, 2750, 2950, 3200, 2800, 2900, 3000]
+  const robertoOverflows1: number[] = []
+  robertoSalesProfile1.forEach((sales, idx) => {
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 7
+    const budget = calculateWeeklyBudget(sales, isInitial, 0)
+    robertoOverflows1.push(budget.overflowOut)
+    snapshots.push({
+      id: `snapshot-roberto-1-${idx}`,
+      campaignId: 'campaign-roberto-1',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn: 0,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Roberto Campaign 2 - receives overflow from 1, may overflow to 3
+  const robertoSalesProfile2 = [650, 720, 580, 800, 700, 750, 0, 0] // Created week 6
+  const robertoOverflows2: number[] = []
+  robertoSalesProfile2.forEach((sales, idx) => {
+    if (idx > 5) return
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 4 // Weeks 5-6 were initial
+    const overflowIn = robertoOverflows1[idx] || 0
+    const budget = calculateWeeklyBudget(sales, isInitial, overflowIn)
+    robertoOverflows2.push(budget.overflowOut)
+    snapshots.push({
+      id: `snapshot-roberto-2-${idx}`,
+      campaignId: 'campaign-roberto-2',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Roberto Campaign 3 - receives overflow from 2
+  const robertoSalesProfile3 = [200, 280, 150, 0, 0, 0, 0, 0] // Created week 3
+  robertoSalesProfile3.forEach((sales, idx) => {
+    if (idx > 2) return
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 1 // Weeks 2-3 were initial
+    const overflowIn = robertoOverflows2[idx] || 0
+    const budget = calculateWeeklyBudget(sales, isInitial, overflowIn)
+    snapshots.push({
+      id: `snapshot-roberto-3-${idx}`,
+      campaignId: 'campaign-roberto-3',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Carlos - moderate performer
+  const carlosSalesProfile = [1650, 1580, 1720, 1600, 1550, 1680, 1700, 0]
+  carlosSalesProfile.forEach((sales, idx) => {
+    if (idx > 6) return
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 5
+    const budget = calculateWeeklyBudget(sales, isInitial, 0)
+    snapshots.push({
+      id: `snapshot-carlos-1-${idx}`,
+      campaignId: 'campaign-carlos-1',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn: 0,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Ana - moderate performer
+  const anaSalesProfile = [1450, 1380, 1520, 1400, 1480, 1350, 0, 0]
+  anaSalesProfile.forEach((sales, idx) => {
+    if (idx > 5) return
+    const weekDate = campaignWeekDates[idx]
+    const isInitial = idx >= 4
+    const budget = calculateWeeklyBudget(sales, isInitial, 0)
+    snapshots.push({
+      id: `snapshot-ana-1-${idx}`,
+      campaignId: 'campaign-ana-1',
+      weekDate,
+      totalSales: sales,
+      baseBudget: budget.baseBudget,
+      cappedBudget: budget.cappedBudget,
+      overflowOut: budget.overflowOut,
+      overflowIn: 0,
+      totalBudget: budget.totalBudget,
+      isInitialPeriod: isInitial
+    })
+  })
+
+  // Auto-generate snapshots for all auto-generated campaigns
+  // When overflow cascades, multiple campaigns are created at the same time (same week)
+  // Week dates are newest to oldest: [0]=Dec 18, [1]=Dec 11, ... [7]=Oct 30
+  const autoCampaigns = generateAutoCampaigns()
+  const campaignsByOwner = new Map<string, typeof autoCampaigns>()
+
+  autoCampaigns.forEach(campaign => {
+    const existing = campaignsByOwner.get(campaign.ownerId) || []
+    existing.push(campaign)
+    campaignsByOwner.set(campaign.ownerId, existing)
+  })
+
+  // Process each owner's campaign chain
+  campaignsByOwner.forEach((userCampaigns, ownerId) => {
+    const user = mockUsers.find(u => u.id === ownerId)
+    if (!user) return
+
+    // Sort by chain position
+    userCampaigns.sort((a, b) => a.chainPosition - b.chainPosition)
+    const campaign1 = userCampaigns.find(c => c.chainPosition === 1)
+    const campaign2 = userCampaigns.find(c => c.chainPosition === 2)
+    const campaign3 = userCampaigns.find(c => c.chainPosition === 3)
+    const campaign4 = userCampaigns.find(c => c.chainPosition === 4)
+
+    if (!campaign1) return
+
+    // Calculate weekly sales
+    const weeklyAvg = Math.floor(user.sales30d / 4)
+    const hash = ownerId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    const getVariance = (week: number) => Math.floor(((hash + week * 17) % 20 - 10) / 100 * weeklyAvg)
+
+    // Timeline (8 weeks, newest first):
+    // Week 6-7 (Oct 30 - Nov 6): Campaign 1 initial (weeks 1-2), no overflow
+    // Week 5 (Nov 13): Campaign 1 first floating week - overflow triggers C2 (and C3, C4 if cascade)
+    // Week 4 (Nov 20): All created campaigns in initial period week 2
+    // Week 3 (Nov 27): All created campaigns transition to floating
+    // Week 0-2 (Dec 4-18): All campaigns floating
+
+    for (let weekIdx = 0; weekIdx < 8; weekIdx++) {
+      const weekDate = campaignWeekDates[weekIdx]
+
+      // Determine Campaign 1's period (initial = weeks 6-7, floating = weeks 0-5)
+      const c1IsInitial = weekIdx >= 6
+      const c1Sales = Math.max(0, weeklyAvg + getVariance(weekIdx))
+      const c1Budget = calculateWeeklyBudget(c1Sales, c1IsInitial, 0)
+
+      snapshots.push({
+        id: `snapshot-auto-${ownerId}-1-${weekIdx}`,
+        campaignId: campaign1.id,
+        weekDate,
+        totalSales: c1Sales,
+        baseBudget: c1Budget.baseBudget,
+        cappedBudget: c1Budget.cappedBudget,
+        overflowOut: c1Budget.overflowOut,
+        overflowIn: 0,
+        totalBudget: c1Budget.totalBudget,
+        isInitialPeriod: c1IsInitial
+      })
+
+      // Campaign 2, 3, 4 all created at week 5 (when C1 first overflows)
+      // They all exist from week 5 onwards, all with same initial period (weeks 4-5)
+      if (campaign2 && weekIdx <= 5) {
+        // All child campaigns: initial = weeks 4-5, floating = weeks 0-3
+        const childIsInitial = weekIdx >= 4
+        const c2Sales = Math.floor(weeklyAvg * 0.12 * (1 + (hash % 10) / 20))
+        const c2OverflowIn = c1Budget.overflowOut
+        const c2Budget = calculateWeeklyBudget(c2Sales, childIsInitial, c2OverflowIn)
+
+        snapshots.push({
+          id: `snapshot-auto-${ownerId}-2-${weekIdx}`,
+          campaignId: campaign2.id,
+          weekDate,
+          totalSales: c2Sales,
+          baseBudget: c2Budget.baseBudget,
+          cappedBudget: c2Budget.cappedBudget,
+          overflowOut: c2Budget.overflowOut,
+          overflowIn: c2OverflowIn,
+          totalBudget: c2Budget.totalBudget,
+          isInitialPeriod: childIsInitial
+        })
+
+        // Campaign 3 created at same time as Campaign 2 (instant cascade)
+        if (campaign3) {
+          const c3Sales = Math.floor(weeklyAvg * 0.08 * (1 + (hash % 10) / 20))
+          const c3OverflowIn = c2Budget.overflowOut
+          const c3Budget = calculateWeeklyBudget(c3Sales, childIsInitial, c3OverflowIn)
+
+          snapshots.push({
+            id: `snapshot-auto-${ownerId}-3-${weekIdx}`,
+            campaignId: campaign3.id,
+            weekDate,
+            totalSales: c3Sales,
+            baseBudget: c3Budget.baseBudget,
+            cappedBudget: c3Budget.cappedBudget,
+            overflowOut: c3Budget.overflowOut,
+            overflowIn: c3OverflowIn,
+            totalBudget: c3Budget.totalBudget,
+            isInitialPeriod: childIsInitial
+          })
+
+          // Campaign 4 created at same time (instant cascade)
+          if (campaign4) {
+            const c4Sales = Math.floor(weeklyAvg * 0.05 * (1 + (hash % 10) / 20))
+            const c4OverflowIn = c3Budget.overflowOut
+            const c4Budget = calculateWeeklyBudget(c4Sales, childIsInitial, c4OverflowIn)
+
+            snapshots.push({
+              id: `snapshot-auto-${ownerId}-4-${weekIdx}`,
+              campaignId: campaign4.id,
+              weekDate,
+              totalSales: c4Sales,
+              baseBudget: c4Budget.baseBudget,
+              cappedBudget: c4Budget.cappedBudget,
+              overflowOut: c4Budget.overflowOut,
+              overflowIn: c4OverflowIn,
+              totalBudget: c4Budget.totalBudget,
+              isInitialPeriod: childIsInitial
+            })
+          }
+        }
+      }
+    }
+  })
+
+  return snapshots
+}
+
+export const mockCampaignSnapshots: CampaignWeeklySnapshot[] = generateCampaignSnapshots()
+
+/**
+ * Mock Campaign Participants
+ * Each campaign has an owner (auto-created) and can have up to 3 additional participants
+ * Manual participants are defined below, auto-campaigns get auto-generated owners.
+ */
+const manualCampaignParticipants: CampaignParticipant[] = [
+  // María's campaign - just owner
+  {
+    id: 'participant-maria-1-owner',
+    campaignId: 'campaign-maria-1',
+    userId: 'user-maria',
+    userName: 'María García',
+    userEmail: 'maria@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-16T00:00:00Z',
+    removedAt: null
+  },
+
+  // Patricia's Campaign 1 - owner + 2 participants
+  {
+    id: 'participant-patricia-1-owner',
+    campaignId: 'campaign-patricia-1',
+    userId: 'user-patricia',
+    userName: 'Patricia Navarro',
+    userEmail: 'patricia@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-09T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-patricia-1-p1',
+    campaignId: 'campaign-patricia-1',
+    userId: 'user-daniel',
+    userName: 'Daniel Guerrero',
+    userEmail: 'daniel@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-10-15T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-patricia-1-p2',
+    campaignId: 'campaign-patricia-1',
+    userId: 'user-carmen',
+    userName: 'Carmen Delgado',
+    userEmail: 'carmen@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-10-20T00:00:00Z',
+    removedAt: null
+  },
+
+  // Patricia's Campaign 2 - just owner
+  {
+    id: 'participant-patricia-2-owner',
+    campaignId: 'campaign-patricia-2',
+    userId: 'user-patricia',
+    userName: 'Patricia Navarro',
+    userEmail: 'patricia@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-11-06T00:00:00Z',
+    removedAt: null
+  },
+
+  // Roberto's campaigns - owner + participants on campaign 1
+  {
+    id: 'participant-roberto-1-owner',
+    campaignId: 'campaign-roberto-1',
+    userId: 'user-roberto',
+    userName: 'Roberto Mendoza',
+    userEmail: 'roberto@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-02T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-roberto-1-p1',
+    campaignId: 'campaign-roberto-1',
+    userId: 'user-jose',
+    userName: 'José Luis Ramos',
+    userEmail: 'jose@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-10-10T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-roberto-1-p2',
+    campaignId: 'campaign-roberto-1',
+    userId: 'user-adriana',
+    userName: 'Adriana Moreno',
+    userEmail: 'adriana@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-10-12T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-roberto-1-p3',
+    campaignId: 'campaign-roberto-1',
+    userId: 'user-sofia',
+    userName: 'Sofía Hernández',
+    userEmail: 'sofia@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-10-15T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-roberto-2-owner',
+    campaignId: 'campaign-roberto-2',
+    userId: 'user-roberto',
+    userName: 'Roberto Mendoza',
+    userEmail: 'roberto@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-23T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-roberto-3-owner',
+    campaignId: 'campaign-roberto-3',
+    userId: 'user-roberto',
+    userName: 'Roberto Mendoza',
+    userEmail: 'roberto@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-11-20T00:00:00Z',
+    removedAt: null
+  },
+
+  // Carlos's campaign - just owner
+  {
+    id: 'participant-carlos-1-owner',
+    campaignId: 'campaign-carlos-1',
+    userId: 'user-carlos',
+    userName: 'Carlos Rodríguez',
+    userEmail: 'carlos@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-23T00:00:00Z',
+    removedAt: null
+  },
+
+  // Ana's campaign - owner + 1 participant
+  {
+    id: 'participant-ana-1-owner',
+    campaignId: 'campaign-ana-1',
+    userId: 'user-ana',
+    userName: 'Ana Martínez',
+    userEmail: 'ana@pakoa.com',
+    role: 'owner' as ParticipantRole,
+    joinedAt: '2024-10-30T00:00:00Z',
+    removedAt: null
+  },
+  {
+    id: 'participant-ana-1-p1',
+    campaignId: 'campaign-ana-1',
+    userId: 'user-alejandro',
+    userName: 'Alejandro Flores',
+    userEmail: 'alejandro@pakoa.com',
+    role: 'participant' as ParticipantRole,
+    joinedAt: '2024-11-05T00:00:00Z',
+    removedAt: null
+  },
+]
+
+// Auto-generate owner participants for all auto-generated campaigns
+function generateAutoParticipants(): CampaignParticipant[] {
+  const autoCampaigns = generateAutoCampaigns()
+  return autoCampaigns.map(campaign => {
+    const user = mockUsers.find(u => u.id === campaign.ownerId)
+    return {
+      id: `participant-auto-${campaign.ownerId}-${campaign.chainPosition}-owner`,
+      campaignId: campaign.id,
+      userId: campaign.ownerId,
+      userName: campaign.ownerName,
+      userEmail: user?.email || '',
+      role: 'owner' as ParticipantRole,
+      joinedAt: campaign.createdAt,
+      removedAt: null
+    }
+  })
+}
+
+// Combine manual and auto-generated participants
+export const mockCampaignParticipants: CampaignParticipant[] = [
+  ...manualCampaignParticipants,
+  ...generateAutoParticipants()
+]
+
+// Function to add a new participant (called when invitation is accepted)
+export function addCampaignParticipant(
+  campaignId: string,
+  userId: string,
+  userName: string,
+  userEmail: string
+): CampaignParticipant | null {
+  // Check if user is already a participant
+  const existingParticipant = mockCampaignParticipants.find(
+    p => p.campaignId === campaignId && p.userId === userId && p.removedAt === null
+  )
+  if (existingParticipant) {
+    console.log(`[PARTICIPANT] User ${userName} is already a participant in this campaign`)
+    return null
+  }
+
+  // Check if campaign is full
+  const activeParticipants = mockCampaignParticipants.filter(
+    p => p.campaignId === campaignId && p.removedAt === null
+  )
+  if (activeParticipants.length >= CAMPAIGN_MAX_PARTICIPANTS) {
+    console.log(`[PARTICIPANT] Campaign is full, cannot add ${userName}`)
+    return null
+  }
+
+  const newParticipant: CampaignParticipant = {
+    id: `participant-${Date.now()}`,
+    campaignId,
+    userId,
+    userName,
+    userEmail,
+    role: 'participant',
+    joinedAt: new Date().toISOString(),
+    removedAt: null
+  }
+
+  mockCampaignParticipants.push(newParticipant)
+  console.log(`[PARTICIPANT] Added ${userName} to campaign ${campaignId}`)
+  return newParticipant
+}
+
+// ============================================================
+// CAMPAIGN HELPER FUNCTIONS
+// ============================================================
+
+// Get campaign by ID
+export function getCampaignById(campaignId: string): Campaign | undefined {
+  return mockCampaigns.find(c => c.id === campaignId)
+}
+
+// Get all campaigns owned by a user (their chain)
+export function getUserCampaignsAsOwner(userId: string): Campaign[] {
+  return mockCampaigns
+    .filter(c => c.ownerId === userId)
+    .sort((a, b) => a.chainPosition - b.chainPosition)
+}
+
+// Get campaigns where user is a participant (not owner)
+export function getUserCampaignsAsParticipant(userId: string): Campaign[] {
+  const participations = mockCampaignParticipants.filter(
+    p => p.userId === userId && p.role === 'participant' && p.removedAt === null
+  )
+  return participations
+    .map(p => getCampaignById(p.campaignId))
+    .filter((c): c is Campaign => c !== undefined)
+}
+
+// Get all campaigns a user can use (owned + participating)
+export function getAllUserCampaigns(userId: string): Campaign[] {
+  const owned = getUserCampaignsAsOwner(userId)
+  const participating = getUserCampaignsAsParticipant(userId)
+  return [...owned, ...participating]
+}
+
+// Get campaign chain starting from root
+export function getCampaignChain(userId: string): Campaign[] {
+  const rootCampaign = mockCampaigns.find(
+    c => c.ownerId === userId && c.parentCampaignId === null
+  )
+  if (!rootCampaign) return []
+
+  const chain: Campaign[] = [rootCampaign]
+  let current = rootCampaign
+
+  while (current.childCampaignId) {
+    const child = getCampaignById(current.childCampaignId)
+    if (!child) break
+    chain.push(child)
+    current = child
+  }
+
+  return chain
+}
+
+// Get snapshots for a campaign
+export function getCampaignSnapshots(campaignId: string): CampaignWeeklySnapshot[] {
+  return mockCampaignSnapshots
+    .filter(s => s.campaignId === campaignId)
+    .sort((a, b) => new Date(b.weekDate).getTime() - new Date(a.weekDate).getTime())
+}
+
+// Get current week's snapshot for a campaign
+export function getCurrentWeekSnapshot(campaignId: string): CampaignWeeklySnapshot | undefined {
+  const snapshots = getCampaignSnapshots(campaignId)
+  return snapshots[0] // Most recent week
+}
+
+// Get all participants for a campaign (active only)
+export function getCampaignParticipants(campaignId: string): CampaignParticipant[] {
+  return mockCampaignParticipants.filter(
+    p => p.campaignId === campaignId && p.removedAt === null
+  )
+}
+
+// Get all participants including removed (for history)
+export function getAllCampaignParticipants(campaignId: string): CampaignParticipant[] {
+  return mockCampaignParticipants.filter(p => p.campaignId === campaignId)
+}
+
+// Check if campaign is full (4 participants)
+export function isCampaignFull(campaignId: string): boolean {
+  return getCampaignParticipants(campaignId).length >= CAMPAIGN_MAX_PARTICIPANTS
+}
+
+// Get active member count for a campaign
+export function getActiveMemberCount(campaignId: string): number {
+  return getCampaignParticipants(campaignId).length
+}
+
+// Check if user can select a campaign for a sale
+export function canSelectCampaign(userId: string, campaignId: string): boolean {
+  const campaign = getCampaignById(campaignId)
+  if (!campaign || campaign.status !== 'ACTIVE') return false
+
+  // Check if user owns it
+  if (campaign.ownerId === userId) return true
+
+  // Check if user is an active participant
+  const participant = mockCampaignParticipants.find(
+    p => p.campaignId === campaignId && p.userId === userId && p.removedAt === null
+  )
+  return !!participant
+}
+
+// Get user's participation info for a campaign
+export function getUserParticipation(userId: string, campaignId: string): CampaignParticipant | undefined {
+  return mockCampaignParticipants.find(
+    p => p.campaignId === campaignId && p.userId === userId && p.removedAt === null
+  )
+}
+
+// Calculate total budget for a user's campaign chain this week
+export function getUserTotalBudgetThisWeek(userId: string): number {
+  const chain = getCampaignChain(userId)
+  return chain.reduce((total, campaign) => {
+    const snapshot = getCurrentWeekSnapshot(campaign.id)
+    return total + (snapshot?.totalBudget || 0)
+  }, 0)
+}
+
+// Get total overflow in a user's chain this week
+export function getUserTotalOverflowThisWeek(userId: string): number {
+  const chain = getCampaignChain(userId)
+  return chain.reduce((total, campaign) => {
+    const snapshot = getCurrentWeekSnapshot(campaign.id)
+    return total + (snapshot?.overflowOut || 0)
+  }, 0)
+}
+
+// Get all campaigns (for admin)
+export function getAllCampaigns(): Campaign[] {
+  return mockCampaigns
+}
+
+// Get campaigns with overflow this week (for admin insights)
+export function getCampaignsWithOverflow(): Campaign[] {
+  return mockCampaigns.filter(campaign => {
+    const snapshot = getCurrentWeekSnapshot(campaign.id)
+    return snapshot && snapshot.overflowOut > 0
+  })
+}
+
+// Get longest campaign chains (for admin insights)
+export function getLongestCampaignChains(): { userId: string; userName: string; chainLength: number }[] {
+  const userChains = new Map<string, number>()
+
+  mockCampaigns
+    .filter(c => c.parentCampaignId === null) // Get root campaigns
+    .forEach(root => {
+      const chain = getCampaignChain(root.ownerId)
+      userChains.set(root.ownerId, chain.length)
+    })
+
+  return Array.from(userChains.entries())
+    .map(([userId, chainLength]) => {
+      const user = getUserById(userId)
+      return {
+        userId,
+        userName: user?.name || 'Unknown',
+        chainLength
+      }
+    })
+    .sort((a, b) => b.chainLength - a.chainLength)
+}
+
+// Get average chain length across platform
+export function getAverageChainLength(): number {
+  const chains = getLongestCampaignChains()
+  if (chains.length === 0) return 0
+  const total = chains.reduce((sum, c) => sum + c.chainLength, 0)
+  return Math.round((total / chains.length) * 10) / 10
+}
+
+// Get total platform budget this week (for admin)
+export function getTotalPlatformBudgetThisWeek(): number {
+  return mockCampaigns.reduce((total, campaign) => {
+    const snapshot = getCurrentWeekSnapshot(campaign.id)
+    return total + (snapshot?.totalBudget || 0)
+  }, 0)
+}

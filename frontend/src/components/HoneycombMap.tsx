@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   mockUsers,
   getUserById,
@@ -223,6 +224,7 @@ const generateHierarchy = (
 const DEFAULT_ZOOM = 4
 
 export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
+  const { t } = useTranslation()
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -320,7 +322,7 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
   const viewBoxOffset = 3000 - viewBoxSize / 2
   const panScaled = { x: (pan.x / zoom) * -1, y: (pan.y / zoom) * -1 }
 
-  const levelNames = ['Tú', 'Hijo', 'Nieto', 'Bisnieto']
+  const levelNames = [t('map.levelNames.you'), t('map.levelNames.child'), t('map.levelNames.grandchild'), t('map.levelNames.greatGrandchild')]
 
   // Get root user name for the title
   const rootUser = getUserById(rootUserId)
@@ -335,7 +337,7 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
             onClick={handleReset}
             className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg font-medium shadow-lg transition-colors"
           >
-            Reset
+            {t('common.reset')}
           </button>
           <button
             onClick={() => setZoom((z) => Math.min(z * 1.5, 15))}
@@ -353,9 +355,9 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
 
         {/* Title */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 text-center">
-          <h2 className="text-xl font-bold">Mapa de Comunidad</h2>
+          <h2 className="text-xl font-bold">{t('map.title')}</h2>
           <p className="text-sm text-white/50">
-            {rootUser?.name || 'Usuario'} - Trackpad: pinch para zoom, dos dedos para navegar
+            {rootUser?.name || 'Usuario'} - Trackpad: {t('map.trackpadInstructions')}
           </p>
         </div>
 
@@ -476,11 +478,11 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
         {/* Stats */}
         <div className="absolute bottom-4 left-4 bg-slate-800/80 backdrop-blur rounded-lg px-4 py-2 text-sm flex gap-4">
           <div>
-            <span className="text-white/50">Slots totales: </span>
+            <span className="text-white/50">{t('map.totalSlots')} </span>
             <span className="font-bold">{stats.totalSlots}</span>
           </div>
           <div>
-            <span className="text-white/50">Ocupados: </span>
+            <span className="text-white/50">{t('map.occupied')} </span>
             <span className="font-bold text-green-400">{stats.filledSlots}</span>
           </div>
         </div>
@@ -489,44 +491,44 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
       {/* Sidebar */}
       <div className="w-64 bg-slate-800/30 p-4 space-y-4 border-l border-white/10">
         <div className="bg-slate-700/30 rounded-xl p-4">
-          <h3 className="font-bold mb-3">Ventas 30 Días</h3>
+          <h3 className="font-bold mb-3">{t('legend.title')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-green-500"></div>
-              <span>Mayor a $17,000</span>
+              <span>{t('legend.above17k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
-              <span>$15,000 - $17,000</span>
+              <span>{t('legend.15kTo17k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-              <span>$12,000 - $15,000</span>
+              <span>{t('legend.12kTo15k')}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-4 h-4 rounded-full bg-red-500"></div>
-              <span>Menor a $12,000</span>
+              <span>{t('legend.below12k')}</span>
             </div>
           </div>
         </div>
 
         <div className="bg-slate-700/30 rounded-xl p-4">
-          <h3 className="font-bold mb-3">Mi Comunidad</h3>
+          <h3 className="font-bold mb-3">{t('team.myCommunity')}</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-white/70">Hijos Activos:</span>
+              <span className="text-white/70">{t('team.activeChildren')}</span>
               <span className="font-bold text-green-400">{stats.hijosActivos}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/70">Hijos Totales:</span>
+              <span className="text-white/70">{t('team.totalChildren')}</span>
               <span className="font-bold">{stats.hijosAsignados}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/70">Nietos:</span>
+              <span className="text-white/70">{t('team.grandchildren')}</span>
               <span className="font-bold">{stats.nietosAsignados}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/70">Bisnietos:</span>
+              <span className="text-white/70">{t('team.greatGrandchildren')}</span>
               <span className="font-bold">{stats.bisnietosAsignados}</span>
             </div>
           </div>
@@ -537,11 +539,11 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
             <h3 className="font-bold mb-2">{selectedNode.name}</h3>
             <div className="text-sm space-y-1">
               <div className="flex justify-between">
-                <span className="text-white/70">Nivel:</span>
+                <span className="text-white/70">{t('team.level')}</span>
                 <span>{levelNames[selectedNode.level]}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Ventas 30d:</span>
+                <span className="text-white/70">{t('llave.sales30d')}</span>
                 <span
                   className="font-bold"
                   style={{ color: getNodeColor(selectedNode.revenue) }}
@@ -550,9 +552,9 @@ export function HoneycombMap({ rootUserId }: HoneycombMapProps) {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/70">Estado:</span>
+                <span className="text-white/70">{t('common.status')}</span>
                 <span className={hasLlave(selectedNode.revenue) ? 'text-green-400' : 'text-red-400'}>
-                  {hasLlave(selectedNode.revenue) ? 'Activo' : 'Inactivo'}
+                  {hasLlave(selectedNode.revenue) ? t('common.active') : t('common.inactive')}
                 </span>
               </div>
               {selectedNode.email && (
