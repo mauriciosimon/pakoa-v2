@@ -1,16 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pakoa</title>
+    <title>PAKOA - La aventura comienza</title>
+    <meta name="description" content="PAKOA - Plataforma de gestión para agentes de ventas. La aventura comienza." />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+
     <script>
       (function() {
         const stored = localStorage.getItem('pakoa-theme');
         const theme = stored === 'dark' || stored === 'light'
           ? stored
-          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          : 'dark'; // Default to dark for portfolio demo
         document.documentElement.classList.add(theme);
       })();
     </script>

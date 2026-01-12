@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +47,7 @@ const adminNavKeys = [
 export function Sidebar() {
   const { t } = useTranslation()
   const { user, isAdmin, isImpersonating, impersonatedUser, stopImpersonation, logout } = useAuth()
+  const { resolvedTheme } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'admin' | 'agent'>('admin')
 
@@ -100,7 +102,11 @@ export function Sidebar() {
     <>
       {/* Logo */}
       <div className="flex h-14 items-center justify-between border-b px-4">
-        <span className="text-xl font-bold text-primary">Pakoa</span>
+        <img
+          src={resolvedTheme === 'dark' ? '/images/branding/logo-white.png' : '/images/branding/logo-color.png'}
+          alt="PAKOA"
+          className="h-8 w-auto"
+        />
         {isAdmin && !isImpersonating && (
           <Badge variant={effectiveViewMode === 'admin' ? 'default' : 'secondary'} className="text-xs">
             {effectiveViewMode === 'admin' ? 'Admin' : t('admin.users')}
