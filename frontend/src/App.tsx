@@ -51,8 +51,8 @@ function AssistantWrapper() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Redirect root to dashboard */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      {/* Redirect root to profile for portfolio demo */}
+      <Route path="/" element={<Navigate to="/profile" replace />} />
 
       {/* Main App Routes */}
       <Route

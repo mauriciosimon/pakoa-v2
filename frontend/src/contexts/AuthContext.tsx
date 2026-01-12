@@ -55,8 +55,8 @@ const mockAgentUser: User = {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Start as admin for development
-  const [user, setUser] = useState<User | null>(mockAdminUser)
+  // Start as agent (María) for portfolio demo
+  const [user, setUser] = useState<User | null>(mockAgentUser)
 
   const [impersonation, setImpersonation] = useState<ImpersonationState>({
     isImpersonating: false,
