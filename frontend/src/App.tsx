@@ -22,10 +22,7 @@ import { AdminCycles } from '@/pages/admin/AdminCycles'
 import { AdminCampaigns } from '@/pages/admin/AdminCampaigns'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
+  // Demo mode: always allow access (no login required for portfolio)
   return <>{children}</>
 }
 
