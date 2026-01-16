@@ -1,12 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useTheme } from '@/contexts/ThemeContext'
 
 // Demo credentials
@@ -16,7 +13,6 @@ const DEMO_USERS = {
 }
 
 export function Login() {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const { loginAsAdmin, loginAsAgent } = useAuth()
   const { resolvedTheme } = useTheme()
@@ -68,13 +64,13 @@ export function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                {error}
+              </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Correo electronico</Label>
+              <label htmlFor="email" className="text-sm font-medium">Correo electronico</label>
               <Input
                 id="email"
                 type="email"
@@ -86,7 +82,7 @@ export function Login() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contrasena</Label>
+              <label htmlFor="password" className="text-sm font-medium">Contrasena</label>
               <Input
                 id="password"
                 type="password"
