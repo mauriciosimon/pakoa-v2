@@ -52,6 +52,7 @@ const mockAgentUser: User = {
   totalRevenue: 45000,
   role: 'agent',
   createdAt: '2024-01-01T00:00:00Z',
+  avatarUrl: '/images/avatars/maria.png',
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

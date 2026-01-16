@@ -96,6 +96,7 @@ export const mockUsers: MockUser[] = [
     totalRevenue: 85000,
     role: 'agent',
     createdAt: '2024-01-01T00:00:00Z',
+    avatarUrl: '/images/avatars/maria.png',
     sales30d: 18500,
     communitySize: 26,
     level: 0,
