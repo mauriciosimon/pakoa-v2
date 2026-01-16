@@ -21,6 +21,7 @@ import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminCycles } from '@/pages/admin/AdminCycles'
 import { AdminCampaigns } from '@/pages/admin/AdminCampaigns'
 import { Login } from '@/pages/Login'
+import { DemoLogin } from '@/pages/DemoLogin'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -130,6 +131,9 @@ function AppRoutes() {
 
       {/* Login */}
       <Route path="/login" element={<Login />} />
+
+      {/* Demo link - auto-login as María */}
+      <Route path="/demo" element={<DemoLogin />} />
 
       {/* 404 */}
       <Route
