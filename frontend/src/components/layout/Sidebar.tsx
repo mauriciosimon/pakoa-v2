@@ -103,7 +103,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-14 items-center justify-between border-b px-4">
         <img
-          src={resolvedTheme === 'dark' ? '/images/branding/logo-white.png' : '/images/branding/logo-color.png'}
+          src={resolvedTheme === 'dark' ? '/images/branding/logo-dark.png' : '/images/branding/logo-light.png'}
           alt="PAKOA"
           className="h-8 w-auto"
         />
