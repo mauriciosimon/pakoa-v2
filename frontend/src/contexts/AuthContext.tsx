@@ -56,8 +56,8 @@ const mockAgentUser: User = {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Start as agent (María) for portfolio demo
-  const [user, setUser] = useState<User | null>(mockAgentUser)
+  // Start logged out - user must login
+  const [user, setUser] = useState<User | null>(null)
 
   const [impersonation, setImpersonation] = useState<ImpersonationState>({
     isImpersonating: false,

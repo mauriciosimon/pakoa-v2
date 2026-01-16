@@ -20,9 +20,13 @@ import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminCycles } from '@/pages/admin/AdminCycles'
 import { AdminCampaigns } from '@/pages/admin/AdminCampaigns'
+import { Login } from '@/pages/Login'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  // Demo mode: always allow access (no login required for portfolio)
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
   return <>{children}</>
 }
 
@@ -51,8 +55,8 @@ function AssistantWrapper() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Redirect root to profile for portfolio demo */}
-      <Route path="/" element={<Navigate to="/profile" replace />} />
+      {/* Redirect root to login */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* Main App Routes */}
       <Route
@@ -124,15 +128,8 @@ function AppRoutes() {
         />
       </Route>
 
-      {/* Login placeholder */}
-      <Route
-        path="/login"
-        element={
-          <div className="flex min-h-screen items-center justify-center">
-            <p>Login page (placeholder)</p>
-          </div>
-        }
-      />
+      {/* Login */}
+      <Route path="/login" element={<Login />} />
 
       {/* 404 */}
       <Route
