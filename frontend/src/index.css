@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Tailwind v4: enable class-based dark mode so dark: utilities respond
+   to the .dark class set on <html> by ThemeContext. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Light theme (default) */
 :root {
   --background: 0 0% 100%;
