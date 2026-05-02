@@ -1860,6 +1860,7 @@ export interface Sale {
   installedAt: string | null
   cancelledAt: string | null
   notes: string | null
+  salesNumber?: string
 }
 
 // Generate sales for a specific user based on their sales30d value

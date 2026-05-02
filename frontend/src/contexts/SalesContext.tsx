@@ -12,6 +12,7 @@ export interface NewSaleInput {
   funnelStatus?: FunnelStatus
   campaignId?: string | null
   notes?: string | null
+  salesNumber?: string
 }
 
 interface SalesContextType {
@@ -80,6 +81,7 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       installedAt: null,
       cancelledAt: null,
       notes: input.notes ?? null,
+      salesNumber: input.salesNumber,
     }
     setAddedSales((prev) => [sale, ...prev])
     return sale

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Card,
@@ -68,7 +68,15 @@ export function Sales() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
+  const [salesNumber, setSalesNumber] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Generate a fresh 6-digit Sales ID whenever the form is opened
+  useEffect(() => {
+    if (showNewSaleForm) {
+      setSalesNumber(Math.floor(100000 + Math.random() * 900000).toString())
+    }
+  }, [showNewSaleForm])
 
   // Date filter - default to last 30 days
   const [startDate, setStartDate] = useState(() => {
@@ -118,6 +126,7 @@ export function Sales() {
     setSelectedProductId('')
     setSelectedCampaignId('')
     setQuantity(1)
+    setSalesNumber('')
     setFormError(null)
   }
 
@@ -149,6 +158,7 @@ export function Sales() {
       funnelStatus: 'PROSPECTO',
       campaignId: selectedCampaignId || null,
       notes: customerEmail.trim() ? `Email: ${customerEmail.trim()}` : null,
+      salesNumber,
     })
 
     resetForm()
@@ -346,6 +356,12 @@ export function Sales() {
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  {t('sales.salesId', { defaultValue: 'Sales ID' })}
+                </label>
+                <Input value={salesNumber} disabled readOnly />
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   {t('sales.clientName')}
