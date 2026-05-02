@@ -166,14 +166,14 @@ export function Sales() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t('sales.title')}</h1>
           <p className="text-muted-foreground">
             {t('sales.subtitle')}
           </p>
         </div>
-        <Button onClick={() => setShowNewSaleForm(!showNewSaleForm)}>
+        <Button className="sm:mt-12" onClick={() => setShowNewSaleForm(!showNewSaleForm)}>
           <Plus className="mr-2 h-4 w-4" />
           {t('sales.newSale')}
         </Button>
