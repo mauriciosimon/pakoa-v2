@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { AssistantProvider } from '@/contexts/AssistantContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
+import { SalesProvider } from '@/contexts/SalesContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AssistantButton, AssistantPanel } from '@/components/assistant'
@@ -153,11 +154,13 @@ function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <NotificationProvider>
-            <AppRoutes />
-            <AssistantWrapper />
-            <DevUserSwitcher />
-          </NotificationProvider>
+          <SalesProvider>
+            <NotificationProvider>
+              <AppRoutes />
+              <AssistantWrapper />
+              <DevUserSwitcher />
+            </NotificationProvider>
+          </SalesProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

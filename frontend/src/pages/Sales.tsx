@@ -21,12 +21,12 @@ import {
 } from '@/components/ui/table'
 import { Plus, Search, Megaphone, Info, Calendar, Users, Clock, CheckCircle, XCircle, FileText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSales } from '@/contexts/SalesContext'
 import {
   getUserById,
   getUserCampaignsAsOwner,
   getUserCampaignsAsParticipant,
   getCurrentWeekSnapshot,
-  getUserSales,
   hasLlave,
 } from '@/data/mockData'
 
@@ -59,11 +59,16 @@ const internetPackages = [
 export function Sales() {
   const { t } = useTranslation()
   const { effectiveUser } = useAuth()
+  const { getSalesForUser, addSale, resetAddedSales, hasAddedSales } = useSales()
   const [searchTerm, setSearchTerm] = useState('')
   const [showNewSaleForm, setShowNewSaleForm] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState('')
   const [selectedCampaignId, setSelectedCampaignId] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
 
   // Date filter - default to last 30 days
   const [startDate, setStartDate] = useState(() => {
@@ -100,11 +105,55 @@ export function Sales() {
 
   const hasCampaigns = ownedCampaigns.length > 0 || participatedCampaigns.length > 0
 
-  // Get user's sales from mockData
+  // Get user's sales (mock seed + locally added)
   const userSales = useMemo(() => {
     if (!effectiveUser) return []
-    return getUserSales(effectiveUser.id)
-  }, [effectiveUser])
+    return getSalesForUser(effectiveUser.id)
+  }, [effectiveUser, getSalesForUser])
+
+  const resetForm = () => {
+    setCustomerName('')
+    setCustomerPhone('')
+    setCustomerEmail('')
+    setSelectedProductId('')
+    setSelectedCampaignId('')
+    setQuantity(1)
+    setFormError(null)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!effectiveUser) return
+
+    const trimmedName = customerName.trim()
+    if (!trimmedName) {
+      setFormError(t('sales.clientName') + ' *')
+      return
+    }
+    const product = internetPackages.find((p) => p.id === selectedProductId)
+    if (!product) {
+      setFormError(t('sales.product') + ' *')
+      return
+    }
+    if (userHasLlave && hasCampaigns && !selectedCampaignId) {
+      setFormError(t('campaigns.title') + ' *')
+      return
+    }
+
+    addSale({
+      userId: effectiveUser.id,
+      customerName: trimmedName,
+      customerPhone: customerPhone.trim(),
+      productType: `${product.name} (x${quantity})`,
+      amount: Math.round(product.price * quantity * 100) / 100,
+      funnelStatus: 'PROSPECTO',
+      campaignId: selectedCampaignId || null,
+      notes: customerEmail.trim() ? `Email: ${customerEmail.trim()}` : null,
+    })
+
+    resetForm()
+    setShowNewSaleForm(false)
+  }
 
   // Status config for funnel statuses
   const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' }> = {
@@ -296,20 +345,34 @@ export function Sales() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 sm:grid-cols-2">
+            <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   {t('sales.clientName')}
                 </label>
-                <Input placeholder={t('sales.clientNamePlaceholder')} />
+                <Input
+                  placeholder={t('sales.clientNamePlaceholder')}
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t('common.phone')}</label>
-                <Input placeholder={t('sales.phonePlaceholder')} />
+                <Input
+                  placeholder={t('sales.phonePlaceholder')}
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t('sales.emailOptional')}</label>
-                <Input type="email" placeholder={t('sales.emailPlaceholder')} />
+                <Input
+                  type="email"
+                  placeholder={t('sales.emailPlaceholder')}
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">{t('sales.product')}</label>
@@ -397,11 +460,19 @@ export function Sales() {
                   </Select>
                 )}
               </div>
+              {formError && (
+                <div className="col-span-full rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {t('sales.missingField', { defaultValue: 'Missing required field' })}: {formError}
+                </div>
+              )}
               <div className="col-span-full flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setShowNewSaleForm(false)}
+                  onClick={() => {
+                    resetForm()
+                    setShowNewSaleForm(false)
+                  }}
                 >
                   {t('common.cancel')}
                 </Button>
@@ -422,14 +493,27 @@ export function Sales() {
                 {t('sales.salesFound', { count: filteredSales.length })}
               </CardDescription>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={t('sales.searchSales')}
-                className="pl-9 sm:w-[250px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              {hasAddedSales && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground"
+                  onClick={resetAddedSales}
+                  title={t('sales.resetDemoTitle', { defaultValue: 'Remove sales added in this browser' })}
+                >
+                  {t('sales.resetDemo', { defaultValue: 'Reset demo data' })}
+                </Button>
+              )}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder={t('sales.searchSales')}
+                  className="pl-9 sm:w-[250px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </CardHeader>

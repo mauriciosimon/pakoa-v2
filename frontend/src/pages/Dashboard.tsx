@@ -31,7 +31,6 @@ import {
 import {
   mockUsers,
   getUserById,
-  getUserSales,
   getTeamMembers,
   getRelativeLevelLabel,
   mockWeeklyData,
@@ -40,6 +39,7 @@ import {
   hasLlave,
   type FunnelStatus,
 } from '@/data/mockData'
+import { useSales } from '@/contexts/SalesContext'
 
 // Helper functions
 function getNextWednesday(): Date {
@@ -82,6 +82,7 @@ interface TeamMemberDisplay {
 export function Dashboard() {
   const { t } = useTranslation()
   const { effectiveUser } = useAuth()
+  const { getSalesForUser } = useSales()
   const [teamFilter, setTeamFilter] = useState<'all' | 'hijo' | 'nieto' | 'bisnieto' | 'tataranieto'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'at-risk'>('all')
   const [teamSort, setTeamSort] = useState<'sales' | 'name' | 'date'>('sales')
@@ -107,11 +108,11 @@ export function Dashboard() {
            mockUsers[0] // fallback to first user
   }, [effectiveUser])
 
-  // Get the user's sales from centralized data
+  // Get the user's sales (centralized mock + locally added)
   const userSales = useMemo(() => {
     if (!currentUserData) return []
-    return getUserSales(currentUserData.id)
-  }, [currentUserData])
+    return getSalesForUser(currentUserData.id)
+  }, [currentUserData, getSalesForUser])
 
   // Get team members (descendants of current user)
   const teamMembers = useMemo((): TeamMemberDisplay[] => {
