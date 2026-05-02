@@ -429,20 +429,14 @@ export function Income() {
               <div>
                 <div className="mb-2 text-sm font-medium">{t('llave.historyWeeks')}</div>
                 <div className="flex gap-1">
-                  {mockLlaveHistory.map((week, i) => (
+                  {mockLlaveHistory.map((week) => (
                     <div
                       key={week.weekDate}
                       className={`relative flex-1 h-8 rounded ${
                         week.hasLlave ? 'bg-green-500' : 'bg-red-400'
                       }`}
                       title={`${formatWeekDate(week.weekDate)}: $${week.sales.toLocaleString()}`}
-                    >
-                      {i === 0 && (
-                        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
-                          {t('common.today')}
-                        </span>
-                      )}
-                    </div>
+                    />
                   ))}
                 </div>
                 <div className="mt-1 flex justify-between text-xs text-muted-foreground">
