@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { AssistantMessage, UserContext } from '@/types/assistant'
 import {
   getUserById,
@@ -13,12 +12,9 @@ import {
 } from '@/data/mockData'
 import type { Sale } from '@/data/mockData'
 
-// Initialize Anthropic client
-// In production, this should be called from a backend API
-const anthropic = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY || '',
-  dangerouslyAllowBrowser: true // Only for development - in production use backend
-})
+// LLM requests are proxied through /api/assistant (Vercel serverless function)
+// which holds the MINIMAX_API_KEY server-side and forwards to MiniMax M2.
+const ASSISTANT_PROXY_URL = '/api/assistant'
 
 // System prompt - Platform Rules (language-agnostic content)
 const PLATFORM_RULES_ES = `Eres el asistente de Pakoa, una plataforma de ventas MLM para servicios de telecomunicaciones. Tu objetivo es ayudar al usuario a maximizar sus ingresos.
@@ -388,44 +384,40 @@ export async function sendAssistantMessage(
   userId: string,
   language: string = 'es'
 ): Promise<string> {
-  // Check if API key is configured
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-  if (!apiKey) {
-    // Return mock response for development without API key
-    return getMockResponse(userMessage, userId, language)
-  }
+  // Build user context + system prompt
+  const userContext = buildUserContext(userId)
+  const userContextPrompt = formatUserContextPrompt(userContext, language)
+  const systemPrompt = `${getPlatformRules(language)}\n\n${userContextPrompt}`
+
+  const messages = [
+    ...formatMessagesForAPI(conversationHistory),
+    { role: 'user' as const, content: userMessage },
+  ]
 
   try {
-    // Build user context
-    const userContext = buildUserContext(userId)
-    const userContextPrompt = formatUserContextPrompt(userContext, language)
-
-    // Build full system prompt with language-specific rules
-    const systemPrompt = `${getPlatformRules(language)}\n\n${userContextPrompt}`
-
-    // Format conversation history
-    const formattedHistory = formatMessagesForAPI(conversationHistory)
-
-    // Add current message
-    const messages = [
-      ...formattedHistory,
-      { role: 'user' as const, content: userMessage }
-    ]
-
-    // Call Claude API
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages
+    const response = await fetch(ASSISTANT_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, messages, maxTokens: 1000 }),
     })
 
-    // Extract text from response
-    const textBlock = response.content.find(block => block.type === 'text')
-    return textBlock?.text || 'Lo siento, no pude generar una respuesta.'
+    if (!response.ok) {
+      // 500 (no key configured) → fall back to canned responses so the demo
+      // still feels alive instead of erroring out.
+      if (response.status === 500) {
+        return getMockResponse(userMessage, userId, language)
+      }
+      throw new Error(`Assistant proxy error: ${response.status}`)
+    }
+
+    const data = (await response.json()) as { text?: string }
+    return data.text || (language === 'en'
+      ? "Sorry, I couldn't generate a response."
+      : 'Lo siento, no pude generar una respuesta.')
   } catch (error) {
-    console.error('Error calling Claude API:', error)
-    throw error
+    console.error('Error calling assistant proxy:', error)
+    // Network/upstream failure during a live demo → graceful fallback.
+    return getMockResponse(userMessage, userId, language)
   }
 }
 
