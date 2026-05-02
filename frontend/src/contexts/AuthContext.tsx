@@ -1,6 +1,32 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { User } from '@/types'
 import { getUserById } from '@/data/mockData'
+
+const AUTH_STORAGE_KEY = 'pakoa.auth.user'
+const IMPERSONATION_STORAGE_KEY = 'pakoa.auth.impersonation'
+
+function readStored<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStored(key: string, value: unknown) {
+  if (typeof window === 'undefined') return
+  try {
+    if (value === null || value === undefined) {
+      window.localStorage.removeItem(key)
+    } else {
+      window.localStorage.setItem(key, JSON.stringify(value))
+    }
+  } catch {
+    // ignore quota / serialization errors
+  }
+}
 
 interface ImpersonationState {
   isImpersonating: boolean
@@ -56,14 +82,25 @@ const mockAgentUser: User = {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Start logged out - user must login
-  const [user, setUser] = useState<User | null>(null)
+  // Hydrate from localStorage so a page refresh keeps the session
+  const [user, setUser] = useState<User | null>(() => readStored<User>(AUTH_STORAGE_KEY))
 
-  const [impersonation, setImpersonation] = useState<ImpersonationState>({
-    isImpersonating: false,
-    originalAdmin: null,
-    impersonatedUser: null,
-  })
+  const [impersonation, setImpersonation] = useState<ImpersonationState>(
+    () =>
+      readStored<ImpersonationState>(IMPERSONATION_STORAGE_KEY) ?? {
+        isImpersonating: false,
+        originalAdmin: null,
+        impersonatedUser: null,
+      }
+  )
+
+  useEffect(() => {
+    writeStored(AUTH_STORAGE_KEY, user)
+  }, [user])
+
+  useEffect(() => {
+    writeStored(IMPERSONATION_STORAGE_KEY, impersonation)
+  }, [impersonation])
 
   const login = async (_email: string, _password: string) => {
     // Mock login - in production this would call the API
