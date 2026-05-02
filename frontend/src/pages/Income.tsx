@@ -214,9 +214,9 @@ function formatWeekDate(dateStr: string): string {
 
 function getRelationshipConfig(rel: 'HIJO' | 'NIETO' | 'BISNIETO', t: any) {
   const configs = {
-    HIJO: { label: t('income.childRelation'), color: 'bg-green-500', textColor: 'text-green-600', rate: '8%' },
-    NIETO: { label: t('income.grandchildRelation'), color: 'bg-purple-500', textColor: 'text-purple-600', rate: '12%' },
-    BISNIETO: { label: t('income.greatGrandchildRelation'), color: 'bg-orange-500', textColor: 'text-orange-600', rate: '20%' },
+    HIJO: { label: t('income.childRelation'), color: 'bg-green-500', textColor: 'text-green-600 dark:text-green-400', rate: '8%' },
+    NIETO: { label: t('income.grandchildRelation'), color: 'bg-purple-500', textColor: 'text-purple-600 dark:text-purple-400', rate: '12%' },
+    BISNIETO: { label: t('income.greatGrandchildRelation'), color: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400', rate: '20%' },
   }
   return configs[rel]
 }
@@ -258,9 +258,9 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
         <div className="flex-1">
           <div className="flex items-center gap-2">
             {member.hasLlave ? (
-              <Link2 className="h-4 w-4 text-green-600" />
+              <Link2 className="h-4 w-4 text-green-600 dark:text-green-400" />
             ) : (
-              <Link2Off className="h-4 w-4 text-red-500" />
+              <Link2Off className="h-4 w-4 text-red-500 dark:text-red-400" />
             )}
             <span className="font-medium">{member.name}</span>
             <Badge variant="outline" className={`text-xs ${config.textColor}`}>
@@ -275,7 +275,7 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
           <div className="mt-1 text-sm text-muted-foreground">
             {t('llave.sales30d')}: ${member.sales30d.toLocaleString()}
             {!member.hasLlave && member.sales30d < LLAVE_THRESHOLD && (
-              <span className="ml-2 text-amber-600">
+              <span className="ml-2 text-amber-600 dark:text-amber-400">
                 ({t('llave.needForLlave', { amount: (LLAVE_THRESHOLD - member.sales30d).toLocaleString() })})
               </span>
             )}
@@ -284,7 +284,7 @@ function ChainMemberRow({ member, depth = 0 }: { member: ChainMember; depth?: nu
 
         {member.potentialCommission > 0 && (
           <div className="text-right">
-            <div className="text-sm font-medium text-amber-600">
+            <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
               +${member.potentialCommission.toFixed(2)}
             </div>
             <div className="text-xs text-muted-foreground">{t('income.potential')}</div>
@@ -681,10 +681,10 @@ export function Income() {
                 <Link2Off className="h-5 w-5" />
                 <span className="font-medium">{t('income.lostCommissionsTitle')}</span>
               </div>
-              <div className="mt-2 text-2xl font-bold text-amber-600">
+              <div className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">
                 ${totalPotentialLost.toFixed(2)} / {t('income.week')}
               </div>
-              <p className="mt-1 text-sm text-amber-600/80">
+              <p className="mt-1 text-sm text-amber-600/80 dark:text-amber-400/80">
                 {t('income.lostCommissionsDescription')}
               </p>
             </div>
@@ -693,23 +693,23 @@ export function Income() {
           {/* Chain legend */}
           <div className="flex flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <Link2 className="h-4 w-4 text-green-500" />
+              <Link2 className="h-4 w-4 text-green-500 dark:text-green-400" />
               <span>{t('income.activeChainLegend')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Link2Off className="h-4 w-4 text-red-500" />
+              <Link2Off className="h-4 w-4 text-red-500 dark:text-red-400" />
               <span>{t('income.brokenChainLegend')}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-green-500" />
+              <div className="h-3 w-3 rounded-full bg-green-500 dark:bg-green-400/80" />
               <span>{t('income.childRelation')} (8%)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-purple-500" />
+              <div className="h-3 w-3 rounded-full bg-purple-500 dark:bg-purple-400/80" />
               <span>{t('income.grandchildRelation')} (12%)</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-orange-500" />
+              <div className="h-3 w-3 rounded-full bg-orange-500 dark:bg-orange-400/80" />
               <span>{t('income.greatGrandchildRelation')} (20%)</span>
             </div>
           </div>
