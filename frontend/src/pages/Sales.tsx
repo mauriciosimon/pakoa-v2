@@ -173,7 +173,7 @@ export function Sales() {
             {t('sales.subtitle')}
           </p>
         </div>
-        <Button className="sm:mt-12" onClick={() => setShowNewSaleForm(!showNewSaleForm)}>
+        <Button className="mt-12 sm:mt-16" onClick={() => setShowNewSaleForm(!showNewSaleForm)}>
           <Plus className="mr-2 h-4 w-4" />
           {t('sales.newSale')}
         </Button>
